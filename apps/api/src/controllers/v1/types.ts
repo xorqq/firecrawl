@@ -74,6 +74,45 @@ const agentExtractModelValue = "fire-1";
 export const isAgentExtractModelValid = (x: string | undefined) =>
   x?.toLowerCase() === agentExtractModelValue;
 
+function normalizeSchemaForOpenAI(schema: any): any {
+  if (!schema || typeof schema !== 'object') return schema;
+  
+  const visited = new WeakSet();
+  
+  function normalizeObject(obj: any): any {
+    if (typeof obj !== 'object' || obj === null) return obj;
+    
+    if (visited.has(obj)) return obj;
+    visited.add(obj);
+    
+    const normalized = { ...obj };
+    
+    if (normalized.type === 'object' && normalized.hasOwnProperty('properties') && normalized.hasOwnProperty('additionalProperties')) {
+      delete normalized.additionalProperties;
+    }
+    
+    if (normalized.type === 'object' && normalized.hasOwnProperty('required') && normalized.hasOwnProperty('properties')) {
+      const validRequired = normalized.required.filter((field: string) => 
+        normalized.properties.hasOwnProperty(field)
+      );
+      if (validRequired.length > 0) {
+        normalized.required = validRequired;
+      } else {
+        delete normalized.required;
+      }
+    }
+    
+    for (const [key, value] of Object.entries(normalized)) {
+      if (typeof value === 'object' && value !== null) {
+        normalized[key] = normalizeObject(value);
+      }
+    }
+    
+    return normalized;
+  }
+  
+  return normalizeObject(schema);
+}
 function validateSchemaForOpenAI(schema: any): boolean {
   if (!schema || typeof schema !== 'object') return true;
   
@@ -85,9 +124,9 @@ function validateSchemaForOpenAI(schema: any): boolean {
     if (visited.has(obj)) return false;
     visited.add(obj);
     
-    if (obj.hasOwnProperty('additionalProperties')) return true;
-    
-    if (obj.type === 'object' && !obj.hasOwnProperty('properties') && !obj.hasOwnProperty('patternProperties')) return true;
+    if (obj.type === 'object' && !obj.hasOwnProperty('properties') && !obj.hasOwnProperty('patternProperties') && obj.additionalProperties === true) {
+      return true;
+    }
     
     for (const value of Object.values(obj)) {
       if (typeof value === 'object' && value !== null) {
@@ -100,7 +139,7 @@ function validateSchemaForOpenAI(schema: any): boolean {
   return !hasInvalidStructure(schema);
 }
 
-const OPENAI_SCHEMA_ERROR_MESSAGE = "Schema contains invalid structure for OpenAI: either 'additionalProperties' property (not supported) or object type without 'properties' defined (required by OpenAI). Please fix your schema.";
+const OPENAI_SCHEMA_ERROR_MESSAGE = "Schema contains invalid structure for OpenAI: object type with no 'properties' defined but 'additionalProperties: true' (schema-less dictionary not supported by OpenAI). Please define specific properties for your object.";
 
 export const agentOptionsExtract = z
   .object({
@@ -128,6 +167,7 @@ export const extractOptions = z
           message: "Invalid JSON schema.",
         },
       )
+      .transform((val) => normalizeSchemaForOpenAI(val))
       .refine(
         (val) => validateSchemaForOpenAI(val),
         {
@@ -165,6 +205,7 @@ const extractOptionsWithAgent = z
           message: "Invalid JSON schema.",
         },
       )
+      .transform((val) => normalizeSchemaForOpenAI(val))
       .refine(
         (val) => validateSchemaForOpenAI(val),
         {
@@ -408,6 +449,7 @@ const baseScrapeOptions = z
               message: "Invalid JSON schema.",
             },
           )
+          .transform((val) => normalizeSchemaForOpenAI(val))
           .refine(
             (val) => validateSchemaForOpenAI(val),
             {
@@ -620,6 +662,7 @@ const extractV1Options = z
           message: "Invalid JSON schema.",
         },
       )
+      .transform((val) => normalizeSchemaForOpenAI(val))
       .refine(
         (val) => validateSchemaForOpenAI(val),
         {
