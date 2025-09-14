@@ -1,174 +1,158 @@
-import axios from "axios";
 import { JSDOM } from "jsdom";
 import { SearchV2Response, WebSearchResult } from "../../lib/entities";
 import { logger } from "../../lib/logger";
-import https from "https";
+import { scrapeURL } from "../../scraper/scrapeURL";
+import { scrapeOptions } from "../../controllers/v2/types";
+import { CostTracking } from "../../lib/cost-tracking";
 
-const getRandomInt = (min: number, max: number): number =>
-  Math.floor(Math.random() * (max - min + 1)) + min;
-
-function get_useragent(): string {
-  const lynx_version = `Lynx/${getRandomInt(2, 3)}.${getRandomInt(8, 9)}.${getRandomInt(0, 2)}`;
-  const libwww_version = `libwww-FM/${getRandomInt(2, 3)}.${getRandomInt(13, 15)}`;
-  const ssl_mm_version = `SSL-MM/${getRandomInt(1, 2)}.${getRandomInt(3, 5)}`;
-  const openssl_version = `OpenSSL/${getRandomInt(1, 3)}.${getRandomInt(0, 4)}.${getRandomInt(0, 9)}`;
-  return `${lynx_version} ${libwww_version} ${ssl_mm_version} ${openssl_version}`;
-}
-
-async function _req(
+function buildInitialSearchURL(
   term: string,
   results: number,
   lang: string,
   country: string,
-  start: number,
-  proxies: any,
-  timeout: number,
-  tbs: string | undefined = undefined,
-  filter: string | undefined = undefined,
-) {
+  tbs?: string,
+  filter?: string,
+): string {
+  const url = new URL("https://www.google.com/search");
   const params = {
     q: term,
-    num: results + 2, // Number of results to return
+    oq: term,
+    num: (results + 2).toString(),
     hl: lang,
     gl: country,
     safe: "active",
-    start: start,
+    start: "0",
+    ...(tbs && { tbs }),
+    ...(filter && { filter }),
   };
-  if (tbs) {
-    params["tbs"] = tbs;
-  }
-  if (filter) {
-    params["filter"] = filter;
-  }
-  var agent = get_useragent();
-  try {
-    const resp = await axios.get("https://www.google.com/search", {
-      headers: {
-        "User-Agent": agent,
-        Accept: "*/*",
-      },
-      params: params,
-      proxy: proxies,
-      timeout: timeout,
-      httpsAgent: new https.Agent({
-        rejectUnauthorized: true,
-      }),
-      withCredentials: true,
-    });
-    return resp;
-  } catch (error) {
-    if (error.response && error.response.status === 429) {
-      logger.warn("Google Search: Too many requests, try again later.", {
-        status: error.response.status,
-        statusText: error.response.statusText,
-      });
-      throw new Error("Google Search: Too many requests, try again later.");
+
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+
+  return url.toString();
+}
+
+function parseSearchResults(html: string): {
+  results: WebSearchResult[];
+  nextUrl: string | null;
+} {
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
+
+  const nextLink = document.querySelector("a[id=pnnext]") as HTMLAnchorElement;
+  const nextUrl = nextLink ? `https://www.google.com${nextLink.href}` : null;
+
+  const rposElements = document.querySelectorAll("div[data-rpos]");
+  const results: WebSearchResult[] = [];
+  const seenUrls = new Set<string>();
+
+  for (const element of rposElements) {
+    const linkTag = element.querySelector("a") as HTMLAnchorElement;
+    if (!linkTag) continue;
+
+    const clampDiv = element.querySelector(
+      "div[style*='-webkit-line-clamp:2']",
+    );
+    const descriptionSpan = clampDiv?.querySelector("span");
+
+    if (linkTag && descriptionSpan) {
+      const url = linkTag.href;
+      const title = linkTag.textContent?.trim() || "";
+      const description = descriptionSpan.textContent?.trim() || "";
+
+      if (url && title && description && !seenUrls.has(url)) {
+        seenUrls.add(url);
+        results.push({ url, title, description });
+      }
     }
-    throw error;
   }
+
+  return { results, nextUrl };
 }
 
 export async function googleSearch(
   term: string,
   advanced = false,
   num_results = 5,
-  tbs = undefined as string | undefined,
-  filter = undefined as string | undefined,
+  tbs?: string,
+  filter?: string,
   lang = "en",
   country = "us",
-  proxy = undefined as string | undefined,
+  proxy?: string,
   sleep_interval = 0,
   timeout = 5000,
 ): Promise<SearchV2Response> {
-  let proxies: any = null;
-  if (proxy) {
-    if (proxy.startsWith("https")) {
-      proxies = { https: proxy };
-    } else {
-      proxies = { http: proxy };
-    }
-  }
+  const allResults: WebSearchResult[] = [];
+  let currentUrl: string | null = buildInitialSearchURL(
+    term,
+    num_results,
+    lang,
+    country,
+    tbs,
+    filter,
+  );
 
-  // TODO: knowledge graph, answer box, etc.
-
-  let start = 0;
-  let results: WebSearchResult[] = [];
   let attempts = 0;
-  const maxAttempts = 20; // Define a maximum number of attempts to prevent infinite loop
-  while (start < num_results && attempts < maxAttempts) {
+  const maxAttempts = 10;
+
+  while (
+    currentUrl &&
+    allResults.length < num_results &&
+    attempts < maxAttempts
+  ) {
     try {
-      const resp = await _req(
-        term,
-        num_results - start,
-        lang,
-        country,
-        start,
-        proxies,
-        timeout,
-        tbs,
-        filter,
+      const result = await scrapeURL(
+        `google-search:${term}:${num_results}:${lang}:${country}`,
+        currentUrl,
+        scrapeOptions.parse({ formats: [{ type: "rawHtml" }] }),
+        { teamId: "search" },
+        new CostTracking(),
       );
-      const dom = new JSDOM(resp.data);
-      const document = dom.window.document;
-      const result_block = document.querySelectorAll("div.ezO2md");
-      let new_results = 0;
-      let unique = true;
-      let fetched_results = 0;
 
-      const fetched_links = new Set<string>();
-      if (result_block.length === 0) {
-        start += 1;
-        attempts += 1;
-      } else {
-        attempts = 0;
+      if (!result.success) {
+        throw new Error(`Failed to fetch search results: ${result.error}`);
       }
 
-      for (const result of result_block) {
-        const link_tag = result.querySelector(
-          "a[href].fuLhoc.ZWRArf",
-        ) as HTMLAnchorElement;
-        const title_tag = link_tag
-          ? link_tag.querySelector("span.CVA68e")
-          : null;
-        const description_tag = result.querySelector("span.FrIlee span.fYyStc");
+      const html = result.document.rawHtml!;
 
-        if (link_tag && title_tag && description_tag) {
-          const link = decodeURIComponent(
-            link_tag.href.split("&")[0].replace("/url?q=", ""),
-          );
-          if (fetched_links.has(link) && unique) continue;
-          fetched_links.add(link);
-          const title = title_tag.textContent || "";
-          const description = description_tag.textContent || "";
-          fetched_results++;
-          new_results++;
-          if (link && title && description) {
-            start += 1;
-            results.push({
-              url: link,
-              title: title,
-              description: description,
-            });
-          }
-          if (fetched_results >= num_results) break;
-        }
+      const { results, nextUrl } = parseSearchResults(html);
+
+      if (results.length === 0) {
+        attempts++;
+        currentUrl = nextUrl;
+        continue;
       }
 
-      await new Promise(resolve => setTimeout(resolve, sleep_interval * 1000));
+      const remainingSlots = num_results - allResults.length;
+      allResults.push(...results.slice(0, remainingSlots));
+
+      attempts = 0;
+
+      currentUrl = allResults.length < num_results ? nextUrl : null;
+
+      if (sleep_interval > 0) {
+        await new Promise(resolve =>
+          setTimeout(resolve, sleep_interval * 1000),
+        );
+      }
     } catch (error) {
       if (error.message === "Too many requests") {
-        logger.warn("Too many requests, breaking the loop");
+        logger.warn("Too many requests, stopping search");
         break;
       }
-      throw error;
-    }
+      attempts++;
+      logger.error(`Search attempt ${attempts} failed`, { error });
 
-    if (start === 0) {
-      return results.length > 0 ? { web: results } : {};
+      if (attempts >= maxAttempts) {
+        throw error;
+      }
     }
   }
+
   if (attempts >= maxAttempts) {
-    logger.warn("Max attempts reached, breaking the loop");
+    logger.warn("Max attempts reached, returning partial results");
   }
-  return results.length > 0 ? { web: results } : {};
+
+  return allResults.length > 0 ? { web: allResults } : {};
 }

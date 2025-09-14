@@ -17,12 +17,9 @@ importers:
       express:
         specifier: ^4.19.2
         version: 4.21.2
-      playwright:
-        specifier: ^1.45.0
-        version: 1.49.1
-      user-agents:
-        specifier: ^1.1.410
-        version: 1.1.455
+      patchright:
+        specifier: ^1.55.1
+        version: 1.55.1
     devDependencies:
       '@types/body-parser':
         specifier: ^1.19.5
@@ -273,9 +270,6 @@ packages:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
     engines: {node: '>= 0.10'}
 
-  lodash.clonedeep@4.5.0:
-    resolution: {integrity: sha512-H5ZhCF25riFd9uB5UCkVKo61m3S/xZk1x4wA6yp/L3RFP6Z/eHH1ymQcGLo7J3GMPfm0V/7m1tryHuGVxpqEBQ==}
-
   make-error@1.3.6:
     resolution: {integrity: sha512-s8UhlNe7vPKomQhC1qFelMokr/Sc3AgNbso3n74mVPA5LTZwkB9NlXf4XPamLxJE8h0gh73rM94xvwRT2CVInw==}
 
@@ -329,18 +323,18 @@ packages:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
 
+  patchright-core@1.55.1:
+    resolution: {integrity: sha512-SHUW++cXt+htd726M/0aBstVuS5O961V0ua3DWJ/b/fsBA498XORzKbLYOyqo/MeJhOSAOdKtutmfq3gSdKJDQ==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  patchright@1.55.1:
+    resolution: {integrity: sha512-uj8X0sr5TlvabPLZDPQeip1uQ+CeO6VhBQpttNeAEzof3HeIKgRyAJfeNRa5XfU7z768B5w7qQ1hH6Dq6MrPzg==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   path-to-regexp@0.1.12:
     resolution: {integrity: sha512-RA1GjUVMnvYFxuqovrEqZoxxW5NUZqbwKtYz/Tt7nXerk0LbLblQmrsgdeOxV5SFHf0UDggjS/bSeOZwt1pmEQ==}
-
-  playwright-core@1.49.1:
-    resolution: {integrity: sha512-BzmpVcs4kE2CH15rWfzpjzVGhWERJfmnXmniSyKeRZUs9Ws65m+RGIi7mjJK/euCegfn3i7jvqWeWyHe9y3Vgg==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.49.1:
-    resolution: {integrity: sha512-VYL8zLoNTBxVOrJBbDuRgDWa3i+mfQgDTrL8Ah9QXZ7ax4Dsj0MSq5bYgytRnDVVe+njoKnfsYkH3HzqVj5UZA==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   proxy-addr@2.0.7:
     resolution: {integrity: sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==}
@@ -428,9 +422,6 @@ packages:
   unpipe@1.0.0:
     resolution: {integrity: sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==}
     engines: {node: '>= 0.8'}
-
-  user-agents@1.1.455:
-    resolution: {integrity: sha512-C5FfBiUlxZAYI+nsxg2iUcVrC0CxjawRZMxoUA9Z5MUm1mC0phPvs7iPe9ksKVaZrsyNLivDeIUxJvHFuCXyLw==}
 
   utils-merge@1.0.1:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
@@ -704,8 +695,6 @@ snapshots:
 
   ipaddr.js@1.9.1: {}
 
-  lodash.clonedeep@4.5.0: {}
-
   make-error@1.3.6: {}
 
   math-intrinsics@1.1.0: {}
@@ -738,15 +727,15 @@ snapshots:
 
   parseurl@1.3.3: {}
 
-  path-to-regexp@0.1.12: {}
+  patchright-core@1.55.1: {}
 
-  playwright-core@1.49.1: {}
-
-  playwright@1.49.1:
+  patchright@1.55.1:
     dependencies:
-      playwright-core: 1.49.1
+      patchright-core: 1.55.1
     optionalDependencies:
       fsevents: 2.3.2
+
+  path-to-regexp@0.1.12: {}
 
   proxy-addr@2.0.7:
     dependencies:
@@ -859,10 +848,6 @@ snapshots:
   undici-types@6.19.8: {}
 
   unpipe@1.0.0: {}
-
-  user-agents@1.1.455:
-    dependencies:
-      lodash.clonedeep: 4.5.0
 
   utils-merge@1.0.1: {}
 

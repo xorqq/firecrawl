@@ -33,7 +33,10 @@ export async function downloadFile(
   response: undici.Response;
   tempFilePath: string;
 }> {
-  const tempFilePath = path.join(os.tmpdir(), `tempFile-${id}--${uuid()}`);
+  const tempFilePath = path.join(
+    os.tmpdir(),
+    `tempFile-${id.replace(/[<>:"/\\|?*]/g, "_")}--${uuid()}`,
+  );
   const tempFileWrite = createWriteStream(tempFilePath);
 
   // TODO: maybe we could use tlsclient for this? for proxying
