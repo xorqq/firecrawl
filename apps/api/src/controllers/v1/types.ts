@@ -175,29 +175,9 @@ export const extractOptions = z
           message: "Invalid JSON schema.",
         },
       )
-      .transform((val) => {
-        try {
-          console.log('[DEBUG] Transform called with:', JSON.stringify(val, null, 2));
-          const result = normalizeSchemaForOpenAI(val);
-          console.log('[DEBUG] Transform result:', JSON.stringify(result, null, 2));
-          return result;
-        } catch (error) {
-          console.error('[ERROR] Schema normalization failed:', error.message, error.stack);
-          throw new Error(`Schema normalization failed: ${error.message}`);
-        }
-      })
+      .transform((val) => normalizeSchemaForOpenAI(val))
       .refine(
-        (val) => {
-          try {
-            console.log('[DEBUG] Refine called with:', JSON.stringify(val, null, 2));
-            const result = validateSchemaForOpenAI(val);
-            console.log('[DEBUG] Refine result:', result);
-            return result;
-          } catch (error) {
-            console.error('[ERROR] Schema validation failed:', error.message, error.stack);
-            return false;
-          }
-        },
+        (val) => validateSchemaForOpenAI(val),
         {
           message: OPENAI_SCHEMA_ERROR_MESSAGE,
         },
@@ -233,29 +213,9 @@ const extractOptionsWithAgent = z
           message: "Invalid JSON schema.",
         },
       )
-      .transform((val) => {
-        try {
-          console.log('[DEBUG] Transform called with:', JSON.stringify(val, null, 2));
-          const result = normalizeSchemaForOpenAI(val);
-          console.log('[DEBUG] Transform result:', JSON.stringify(result, null, 2));
-          return result;
-        } catch (error) {
-          console.error('[ERROR] Schema normalization failed:', error.message, error.stack);
-          throw new Error(`Schema normalization failed: ${error.message}`);
-        }
-      })
+      .transform((val) => normalizeSchemaForOpenAI(val))
       .refine(
-        (val) => {
-          try {
-            console.log('[DEBUG] Refine called with:', JSON.stringify(val, null, 2));
-            const result = validateSchemaForOpenAI(val);
-            console.log('[DEBUG] Refine result:', result);
-            return result;
-          } catch (error) {
-            console.error('[ERROR] Schema validation failed:', error.message, error.stack);
-            return false;
-          }
-        },
+        (val) => validateSchemaForOpenAI(val),
         {
           message: OPENAI_SCHEMA_ERROR_MESSAGE,
         },
@@ -710,29 +670,9 @@ const extractV1Options = z
           message: "Invalid JSON schema.",
         },
       )
-      .transform((val) => {
-        try {
-          console.log('[DEBUG] Transform called with:', JSON.stringify(val, null, 2));
-          const result = normalizeSchemaForOpenAI(val);
-          console.log('[DEBUG] Transform result:', JSON.stringify(result, null, 2));
-          return result;
-        } catch (error) {
-          console.error('[ERROR] Schema normalization failed:', error.message, error.stack);
-          throw new Error(`Schema normalization failed: ${error.message}`);
-        }
-      })
+      .transform((val) => normalizeSchemaForOpenAI(val))
       .refine(
-        (val) => {
-          try {
-            console.log('[DEBUG] Refine called with:', JSON.stringify(val, null, 2));
-            const result = validateSchemaForOpenAI(val);
-            console.log('[DEBUG] Refine result:', result);
-            return result;
-          } catch (error) {
-            console.error('[ERROR] Schema validation failed:', error.message, error.stack);
-            return false;
-          }
-        },
+        (val) => validateSchemaForOpenAI(val),
         {
           message: OPENAI_SCHEMA_ERROR_MESSAGE,
         },
