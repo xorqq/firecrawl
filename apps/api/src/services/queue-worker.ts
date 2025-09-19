@@ -497,7 +497,7 @@ app.listen(workerPort, () => {
 });
 
 (async () => {
-  await initializeBlocklist();
+  await initializeBlocklist().catch(e => { _logger.error("Failed to initialize blocklist", { error: e }); process.exit(1); });
 
   await Promise.all([
     workerFun(getExtractQueue(), processExtractJobInternal),
