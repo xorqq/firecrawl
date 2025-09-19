@@ -4,8 +4,11 @@ import { processJobInternal } from "./scrape-worker";
 import { scrapeQueue, nuqGetLocalMetrics, nuqHealthCheck } from "./nuq";
 import Express from "express";
 import { _ } from "ajv";
+import { initializeBlocklist } from "../../scraper/WebScraper/utils/blocklist";
 
 (async () => {
+  await initializeBlocklist();
+
   let isShuttingDown = false;
   const myLock = crypto.randomUUID();
 

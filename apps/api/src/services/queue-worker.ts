@@ -38,6 +38,7 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
 import { BullMQOtel } from "bullmq-otel";
 import { pathToFileURL } from "url";
 import { getErrorContactMessage } from "../lib/deployment";
+import { initializeBlocklist } from "../scraper/WebScraper/utils/blocklist";
 
 configDotenv();
 
@@ -496,6 +497,8 @@ app.listen(workerPort, () => {
 });
 
 (async () => {
+  await initializeBlocklist();
+
   await Promise.all([
     workerFun(getExtractQueue(), processExtractJobInternal),
     workerFun(getDeepResearchQueue(), processDeepResearchJobInternal),
