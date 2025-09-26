@@ -189,7 +189,7 @@ export async function getDoneJobsOrderedUntil(
   );
 }
 
-async function isCrawlFinished(id: string) {
+export async function isCrawlFinished(id: string) {
   await redisEvictConnection.expire(
     "crawl:" + id + ":kickoff:finish",
     24 * 60 * 60,

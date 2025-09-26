@@ -1,27 +1,10 @@
 import { Response } from "express";
 import { logger } from "../../lib/logger";
-import {
-  getCrawl,
-  saveCrawl,
-  isCrawlKickoffFinished,
-} from "../../lib/crawl-redis";
+import { getCrawl, saveCrawl, isCrawlFinished } from "../../lib/crawl-redis";
 import * as Sentry from "@sentry/node";
 import { configDotenv } from "dotenv";
 import { RequestWithAuth } from "./types";
-import { redisEvictConnection } from "../../services/redis";
 configDotenv();
-
-async function isCrawlFinished(id: string) {
-  await redisEvictConnection.expire(
-    "crawl:" + id + ":kickoff:finish",
-    24 * 60 * 60,
-  );
-  return (
-    (await redisEvictConnection.scard("crawl:" + id + ":jobs_done")) ===
-      (await redisEvictConnection.scard("crawl:" + id + ":jobs")) &&
-    (await isCrawlKickoffFinished(id))
-  );
-}
 
 export async function crawlCancelController(
   req: RequestWithAuth<{ jobId: string }>,
