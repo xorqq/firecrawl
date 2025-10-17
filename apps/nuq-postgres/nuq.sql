@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS nuq.queue_scrape (
   returnvalue jsonb, -- only for selfhost
   failedreason text, -- only for selfhost
   owner_id uuid,
+  group_id uuid,
   CONSTRAINT queue_scrape_pkey PRIMARY KEY (id)
 );
 
@@ -36,6 +37,8 @@ CREATE INDEX IF NOT EXISTS queue_scrape_active_locked_at_idx ON nuq.queue_scrape
 CREATE INDEX IF NOT EXISTS nuq_queue_scrape_queued_optimal_2_idx ON nuq.queue_scrape (priority ASC, created_at ASC, id) WHERE (status = 'queued'::nuq.job_status);
 CREATE INDEX IF NOT EXISTS nuq_queue_scrape_failed_created_at_idx ON nuq.queue_scrape USING btree (created_at) WHERE (status = 'failed'::nuq.job_status);
 CREATE INDEX IF NOT EXISTS nuq_queue_scrape_completed_created_at_idx ON nuq.queue_scrape USING btree (created_at) WHERE (status = 'completed'::nuq.job_status);
+CREATE INDEX IF NOT EXISTS nuq_queue_scrape_queued_owner_idx ON nuq.queue_scrape (owner_id, priority ASC, created_at ASC) WHERE (status = 'queued'::nuq.job_status);
+CREATE INDEX IF NOT EXISTS nuq_queue_scrape_queued_owner_group_idx ON nuq.queue_scrape (owner_id, group_id, priority ASC, created_at ASC) WHERE (status = 'queued'::nuq.job_status);
 
 CREATE TABLE IF NOT EXISTS nuq.queue_scrape_owner_concurrency (
     id uuid NOT NULL,
@@ -58,6 +61,13 @@ STABLE
 AS $$
   SELECT COALESCE((SELECT max_concurrency FROM nuq.queue_scrape_owner_concurrency_source WHERE id = owner_id LIMIT 1), 100)::int8;
 $$;
+
+CREATE TABLE IF NOT EXISTS nuq.queue_scrape_group_concurrency (
+    id uuid NOT NULL,
+    current_concurrency int8 NOT NULL,
+    max_concurrency int8,
+    CONSTRAINT queue_scrape_group_concurrency_pkey PRIMARY KEY (id)
+);
 
 SELECT cron.schedule('nuq_queue_scrape_clean_completed', '*/5 * * * *', $$
   DELETE FROM nuq.queue_scrape WHERE nuq.queue_scrape.status = 'completed'::nuq.job_status AND nuq.queue_scrape.created_at < now() - interval '1 hour';
