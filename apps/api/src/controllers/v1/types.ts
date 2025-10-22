@@ -14,6 +14,7 @@ import Ajv from "ajv";
 import { ErrorCodes } from "../../lib/error";
 import { integrationSchema } from "../../utils/integration";
 import { webhookSchema } from "../../services/webhook/schema";
+import { BrandingProfile } from "../../types/branding";
 
 type Format =
   | "markdown"
@@ -25,7 +26,8 @@ type Format =
   | "extract"
   | "json"
   | "summary"
-  | "changeTracking";
+  | "changeTracking"
+  | "branding";
 
 export const url = z.preprocess(
   x => {
@@ -413,6 +415,7 @@ const baseScrapeOptions = z
         "json",
         "summary",
         "changeTracking",
+        "branding",
       ])
       .array()
       .optional()
@@ -939,6 +942,7 @@ export type Document = {
   extract?: any;
   json?: any;
   summary?: string;
+  branding?: BrandingProfile;
   warning?: string;
   actions?: {
     screenshots?: string[];

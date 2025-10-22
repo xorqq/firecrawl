@@ -721,6 +721,7 @@ async function scrapeURLLoop(meta: Meta): Promise<ScrapeUrlResponse> {
       rawHtml: engineResult.html,
       screenshot: engineResult.screenshot,
       actions: engineResult.actions,
+      branding: engineResult.branding,
       metadata: {
         sourceURL: meta.internalOptions.unnormalizedSourceURL ?? meta.url,
         url: engineResult.url,

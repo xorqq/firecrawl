@@ -19,6 +19,7 @@ import {
   hasFormatOfType,
   hasAnyFormatOfTypes,
 } from "../../../lib/format-utils";
+import { BrandingProfile } from "../../../types/branding";
 
 type Transformer = (
   meta: Meta,
@@ -161,6 +162,41 @@ async function deriveImagesFromHTML(
   return document;
 }
 
+function deriveBrandingFromActions(meta: Meta, document: Document): Document {
+  const hasBranding = hasFormatOfType(meta.options.formats, "branding");
+  if (!hasBranding) {
+    return document;
+  }
+
+  if (document.branding !== undefined) {
+    return document;
+  }
+
+  const brandingReturn = document.actions?.javascriptReturns?.find(
+    x => x.type === "branding",
+  );
+
+  if (!brandingReturn) {
+    return document;
+  }
+
+  const value = brandingReturn.value;
+
+  if (typeof value === "string") {
+    try {
+      document.branding = JSON.parse(value) as BrandingProfile;
+    } catch (error) {
+      meta.logger.warn("Failed to parse branding javascript return", {
+        error,
+      });
+    }
+  } else if (value && typeof value === "object") {
+    document.branding = value as BrandingProfile;
+  }
+
+  return document;
+}
+
 function coerceFieldsToFormats(meta: Meta, document: Document): Document {
   const hasMarkdown = hasFormatOfType(meta.options.formats, "markdown");
   const hasRawHtml = hasFormatOfType(meta.options.formats, "rawHtml");
@@ -174,6 +210,7 @@ function coerceFieldsToFormats(meta: Meta, document: Document): Document {
   const hasJson = hasFormatOfType(meta.options.formats, "json");
   const hasScreenshot = hasFormatOfType(meta.options.formats, "screenshot");
   const hasSummary = hasFormatOfType(meta.options.formats, "summary");
+  const hasBranding = hasFormatOfType(meta.options.formats, "branding");
 
   if (!hasMarkdown && document.markdown !== undefined) {
     delete document.markdown;
@@ -288,6 +325,17 @@ function coerceFieldsToFormats(meta: Meta, document: Document): Document {
     );
   }
 
+  if (!hasBranding && document.branding !== undefined) {
+    meta.logger.warn(
+      "Removed branding from Document because it wasn't in formats -- this indicates the engine returned unexpected data.",
+    );
+    delete document.branding;
+  } else if (hasBranding && document.branding === undefined) {
+    meta.logger.warn(
+      "Request had format branding, but there was no branding field in the result.",
+    );
+  }
+
   if (!hasChangeTracking && document.changeTracking !== undefined) {
     meta.logger.warn(
       "Removed changeTracking from Document because it wasn't in formats -- this is extremely wasteful and indicates a bug.",
@@ -321,7 +369,10 @@ function coerceFieldsToFormats(meta: Meta, document: Document): Document {
     delete document.changeTracking.json;
   }
 
-  if (meta.options.actions === undefined || meta.options.actions.length === 0) {
+  if (
+    !hasBranding &&
+    (meta.options.actions === undefined || meta.options.actions.length === 0)
+  ) {
     delete document.actions;
   }
 
@@ -334,6 +385,7 @@ const transformerStack: Transformer[] = [
   deriveMarkdownFromHTML,
   deriveLinksFromHTML,
   deriveImagesFromHTML,
+  deriveBrandingFromActions,
   deriveMetadataFromRawHTML,
   uploadScreenshot,
   ...(useIndex ? [sendDocumentToIndex] : []),

@@ -18,6 +18,7 @@ import { useIndex } from "../../../services";
 import { hasFormatOfType } from "../../../lib/format-utils";
 import { getPDFMaxPages } from "../../../controllers/v2/types";
 import { PdfMetadata } from "@mendable/firecrawl-rs";
+import { BrandingProfile } from "../../../types/branding";
 
 export type Engine =
   | "fire-engine;chrome-cdp"
@@ -118,6 +119,8 @@ export type EngineScrapeResult = {
     }[];
     pdfs: string[];
   };
+
+  branding?: BrandingProfile;
 
   pdfMetadata?: PdfMetadata;
 
