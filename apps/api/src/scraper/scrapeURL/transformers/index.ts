@@ -164,6 +164,7 @@ async function deriveImagesFromHTML(
 
 function deriveBrandingFromActions(meta: Meta, document: Document): Document {
   const hasBranding = hasFormatOfType(meta.options.formats, "branding");
+
   if (!hasBranding) {
     return document;
   }
@@ -172,15 +173,22 @@ function deriveBrandingFromActions(meta: Meta, document: Document): Document {
     return document;
   }
 
-  const brandingReturn = document.actions?.javascriptReturns?.find(
-    x => x.type === "branding",
+  console.log("🔥 document.actions", document?.actions?.javascriptReturns);
+
+  const brandingReturnIndex = document.actions?.javascriptReturns?.findIndex(
+    x => x.type === "object" && "fonts" in (x.value as any),
   );
 
-  if (!brandingReturn) {
+  console.log("🔥 brandingReturnIndex", brandingReturnIndex);
+
+  if (brandingReturnIndex === -1 || brandingReturnIndex === undefined) {
     return document;
   }
 
-  const value = brandingReturn.value;
+  const value = document.actions!.javascriptReturns![brandingReturnIndex].value;
+
+  // remove the branding return from the actions javascript returns
+  document.actions!.javascriptReturns!.splice(brandingReturnIndex, 1);
 
   if (typeof value === "string") {
     try {
@@ -193,6 +201,8 @@ function deriveBrandingFromActions(meta: Meta, document: Document): Document {
   } else if (value && typeof value === "object") {
     document.branding = value as BrandingProfile;
   }
+
+  console.log("🔥 document.branding", document.branding);
 
   return document;
 }

@@ -452,6 +452,7 @@ export function shouldUseIndex(meta: Meta) {
     process.env.FIRECRAWL_INDEX_WRITE_ONLY !== "true" &&
     meta.options.waitFor === 0 &&
     !hasFormatOfType(meta.options.formats, "changeTracking") &&
+    !hasFormatOfType(meta.options.formats, "branding") &&
     // Skip index if a non-default PDF maxPages is specified
     getPDFMaxPages(meta.options.parsers) === undefined &&
     meta.options.maxAge !== 0 &&

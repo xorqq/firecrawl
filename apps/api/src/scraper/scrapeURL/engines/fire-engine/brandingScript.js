@@ -41,14 +41,16 @@
       if (rgba.length === 9) return rgba.slice(0, 7).toUpperCase();
       return rgba.toUpperCase();
     }
-    
+
     // Try parsing Display P3 or other color() formats: color(display-p3 r g b) or color(srgb r g b)
-    const colorMatch = rgba.match(/color\((?:display-p3|srgb)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i);
+    const colorMatch = rgba.match(
+      /color\((?:display-p3|srgb)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i,
+    );
     if (colorMatch) {
       // Convert 0-1 range to 0-255
-      const [r, g, b] = colorMatch.slice(1, 4).map(n => 
-        clamp(Math.round(parseFloat(n) * 255), 0, 255)
-      );
+      const [r, g, b] = colorMatch
+        .slice(1, 4)
+        .map(n => clamp(Math.round(parseFloat(n) * 255), 0, 255));
       return (
         "#" +
         [r, g, b]
@@ -57,7 +59,7 @@
           .toUpperCase()
       );
     }
-    
+
     // Try direct parsing for rgb()/rgba() format
     const directMatch = rgba.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
     if (directMatch) {
@@ -72,7 +74,7 @@
           .toUpperCase()
       );
     }
-    
+
     // Fallback to canvas method for named colors, etc
     const ctx = document.createElement("canvas").getContext("2d");
     if (!ctx) return null;
@@ -377,17 +379,128 @@
       document.querySelector('meta[name="twitter:image" i]')?.content,
       "twitter",
     );
-    const logoImg = Array.from(document.images).find(
+    // Find logo with prioritization to avoid picking testimonial/partner logos
+    const logoImgCandidates = Array.from(document.images).filter(
       img =>
         /logo/i.test(img.alt || "") ||
         /logo/i.test(img.src) ||
         img.closest('[class*="logo"]'),
     );
+
+    // Filter out testimonials, partners, clients sections
+    const excludePatterns =
+      /testimonial|review|client|customer|partner|trust|brand|company|sponsor|feature/i;
+    const filteredLogos = logoImgCandidates.filter(img => {
+      const parent = img.closest(
+        '[class*="testimonial"], [class*="review"], [class*="client"], [class*="customer"], [class*="partner"], [class*="trust"], [class*="brand"], [class*="company"], [class*="sponsor"], [class*="feature"]',
+      );
+      if (parent) return false;
+      const parentClasses = img.parentElement?.className || "";
+      return !excludePatterns.test(parentClasses);
+    });
+
+    // Prioritize logos in header/nav, then by position (top of page), then by size
+    const logoImg =
+      filteredLogos.length > 0
+        ? filteredLogos.reduce((best, img) => {
+            if (!best) return img;
+
+            // Strongly prefer header/nav logos
+            const imgInHeader = img.closest('header, nav, [role="banner"]');
+            const bestInHeader = best.closest('header, nav, [role="banner"]');
+            if (imgInHeader && !bestInHeader) return img;
+            if (!imgInHeader && bestInHeader) return best;
+
+            // Prefer images higher on the page
+            const imgRect = img.getBoundingClientRect();
+            const bestRect = best.getBoundingClientRect();
+            if (Math.abs(imgRect.top - bestRect.top) > 200) {
+              return imgRect.top < bestRect.top ? img : best;
+            }
+
+            // Prefer larger images (but not too large - main logos are typically reasonable size)
+            const imgArea = imgRect.width * imgRect.height;
+            const bestArea = bestRect.width * bestRect.height;
+            if (
+              imgArea > 100 &&
+              imgArea < 100000 &&
+              bestArea > 100 &&
+              bestArea < 100000
+            ) {
+              return imgArea > bestArea ? img : best;
+            }
+
+            return best;
+          }, null)
+        : logoImgCandidates[0]; // Fallback to first match if all filtered out
+
     if (logoImg) push(logoImg.src, "logo");
 
-    const svgLogo = Array.from(document.querySelectorAll("svg")).find(
+    // Find SVG logo with similar prioritization
+    const svgLogoCandidates = Array.from(
+      document.querySelectorAll("svg"),
+    ).filter(
       s => /logo/i.test(s.id) || /logo/i.test(s.className?.baseVal || ""),
     );
+
+    // Filter out testimonials, partners, clients sections for SVG logos
+    const filteredSvgLogos = svgLogoCandidates.filter(svg => {
+      const parent = svg.closest(
+        '[class*="testimonial"], [class*="review"], [class*="client"], [class*="customer"], [class*="partner"], [class*="trust"], [class*="brand"], [class*="company"], [class*="sponsor"], [class*="feature"]',
+      );
+      return !parent;
+    });
+
+    // Prioritize SVG logos in header/nav, then by position
+    let svgLogo =
+      filteredSvgLogos.length > 0
+        ? filteredSvgLogos.reduce((best, svg) => {
+            if (!best) return svg;
+
+            // Strongly prefer header/nav SVG logos
+            const svgInHeader = svg.closest('header, nav, [role="banner"]');
+            const bestInHeader = best.closest('header, nav, [role="banner"]');
+            if (svgInHeader && !bestInHeader) return svg;
+            if (!svgInHeader && bestInHeader) return best;
+
+            // Prefer SVGs higher on the page
+            const svgRect = svg.getBoundingClientRect();
+            const bestRect = best.getBoundingClientRect();
+            return svgRect.top < bestRect.top ? svg : best;
+          }, null)
+        : svgLogoCandidates[0]; // Fallback to first match
+
+    // Fallback: if no obvious logo found, look for SVGs in header/nav
+    if (!svgLogo) {
+      const headerSvgs = Array.from(
+        document.querySelectorAll('header svg, nav svg, [role="banner"] svg'),
+      ).filter(svg => {
+        // Filter out very small SVGs (likely icons, not logos)
+        const rect = svg.getBoundingClientRect();
+        const minLogoSize = 20; // Minimum width or height
+        const maxLogoSize = 500; // Maximum to avoid hero images
+        if (rect.width < minLogoSize || rect.height < minLogoSize) return false;
+        if (rect.width > maxLogoSize && rect.height > maxLogoSize) return false;
+
+        // Filter out common icon patterns in class/id
+        const id = (svg.id || "").toLowerCase();
+        const className = (svg.className?.baseVal || "").toLowerCase();
+        const iconPatterns = /icon|arrow|chevron|menu|hamburger|close|search/i;
+        if (iconPatterns.test(id) || iconPatterns.test(className)) return false;
+
+        // Filter out testimonials, partners sections
+        const parent = svg.closest(
+          '[class*="testimonial"], [class*="review"], [class*="client"], [class*="customer"], [class*="partner"], [class*="trust"], [class*="brand"], [class*="company"], [class*="sponsor"], [class*="feature"]',
+        );
+        return !parent;
+      });
+
+      // Pick the first suitable SVG (they're already prioritized by being in header)
+      if (headerSvgs.length > 0) {
+        svgLogo = headerSvgs[0];
+      }
+    }
+
     if (svgLogo) {
       const serializer = new XMLSerializer();
       const svgStr =
@@ -588,10 +701,10 @@
     // Separate primary buttons from other buttons
     const primaryButtons = buttonsWithColor.filter(isPrimaryButton);
     const otherButtons = buttonsWithColor.filter(b => !isPrimaryButton(b));
-    
+
     // Debug: why are primary buttons being filtered out?
     const rejectedPrimaryButtons = allPrimaryButtons.filter(
-      pb => !primaryButtons.includes(pb)
+      pb => !primaryButtons.includes(pb),
     );
 
     // Sort both lists by area to prefer prominent buttons
@@ -630,15 +743,19 @@
           .sort()
           .join(" ");
         if (btnClasses) {
-          classPatterns.set(btnClasses, (classPatterns.get(btnClasses) || 0) + 1);
+          classPatterns.set(
+            btnClasses,
+            (classPatterns.get(btnClasses) || 0) + 1,
+          );
         }
       }
-      
+
       // Find the most common pattern
       if (classPatterns.size > 0) {
-        const mostCommon = Array.from(classPatterns.entries())
-          .sort((a, b) => b[1] - a[1])[0][0];
-        
+        const mostCommon = Array.from(classPatterns.entries()).sort(
+          (a, b) => b[1] - a[1],
+        )[0][0];
+
         // Find the first button with this pattern
         secondaryButton = otherButtons.find(b => {
           const btnClasses = b.classes
@@ -660,8 +777,6 @@
       secondaryButton = otherButtons[0];
       secondarySelectionMethod = "fallback to first non-primary button";
     }
-
-    
 
     const input = snapshots.find(s => s.isInputLike);
     const card = snapshots.find(s => s.isCardLike);
@@ -687,77 +802,25 @@
           text_color: btnText,
           hover_background: undefined,
           border_radius: defRadius,
-          _debug_selected: btn?.selector || "no button found",
-          _debug_all_buttons_found: allButtons.length,
-          _debug_all_primary_buttons_found: allPrimaryButtons.length,
-          _debug_colored_buttons_found: buttonsWithColor.length,
-          _debug_primary_buttons_found: primaryButtons.length,
-          _debug_rejected_primary_buttons_found: rejectedPrimaryButtons.length,
-          _debug_all_buttons: allButtons.slice(0, 10).map(b => ({
-            selector: b.selector,
-            bg: b.colors.background,
-            bgRaw: b._raw_colors?.background,
-            text: b.colors.text,
-            textRaw: b._raw_colors?.text,
-            size: `${Math.round(b.rect.w)}x${Math.round(b.rect.h)}`,
-            isPrimary: isPrimaryButton(b),
-            passedColorCheck: b.colors.background
-              ? isColorValid(b.colors.background)
-              : false,
-            hasBg: !!b.colors.background,
-            hasText: !!b.colors.text,
-            yiq: b.colors.background ? contrastYIQ(b.colors.background) : null,
-          })),
-          _debug_all_primary_buttons: allPrimaryButtons.map(b => ({
-            selector: b.selector,
-            bg: b.colors.background,
-            bgRaw: b._raw_colors?.background,
-            text: b.colors.text,
-            textRaw: b._raw_colors?.text,
-            size: `${Math.round(b.rect.w)}x${Math.round(b.rect.h)}`,
-            passedColorCheck: b.colors.background
-              ? isColorValid(b.colors.background)
-              : false,
-            hasBg: !!b.colors.background,
-            hasText: !!b.colors.text,
-            sizeOk: b.rect.w > 20 && b.rect.h > 10,
-            yiq: b.colors.background ? contrastYIQ(b.colors.background) : null,
-          })),
-          _debug_primary_buttons: primaryButtons.slice(0, 5).map(b => ({
-            selector: b.selector,
-            bg: b.colors.background,
-            text: b.colors.text,
-            size: `${Math.round(b.rect.w)}x${Math.round(b.rect.h)}`,
-          })),
-          _debug_other_colored_buttons: otherButtons.slice(0, 5).map(b => ({
-            selector: b.selector,
-            bg: b.colors.background,
-            text: b.colors.text,
-            size: `${Math.round(b.rect.w)}x${Math.round(b.rect.h)}`,
-            classes: b.classes.filter(c => /btn|button/i.test(c)).join(" "),
-          })),
         },
-        secondary: secondaryButton ? {
-          background: secondaryButton.colors.background || "#FFFFFF",
-          text_color: secondaryButton.colors.text || (palette.accent || palette.primary),
-          border: secondaryButton.colors.border ? `1px solid ${secondaryButton.colors.border}` : `1px solid ${palette.accent || palette.primary}`,
-          border_radius: defRadius,
-          _debug_selector: secondaryButton.selector,
-          _debug_selection_method: secondarySelectionMethod,
-          _debug_button_class_patterns: classPatterns.size > 0 
-            ? Array.from(classPatterns.entries())
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5)
-                .map(([pattern, count]) => ({ pattern, count }))
-            : "no patterns found",
-        } : {
-          background: "#FFFFFF",
-          text_color: palette.accent || palette.primary,
-          border: `1px solid ${palette.accent || palette.primary}`,
-          border_radius: defRadius,
-          _debug_selector: "no secondary button found",
-          _debug_selection_method: "none - using defaults",
-        },
+        secondary: secondaryButton
+          ? {
+              background: secondaryButton.colors.background || "#FFFFFF",
+              text_color:
+                secondaryButton.colors.text ||
+                palette.accent ||
+                palette.primary,
+              border: secondaryButton.colors.border
+                ? `1px solid ${secondaryButton.colors.border}`
+                : `1px solid ${palette.accent || palette.primary}`,
+              border_radius: defRadius,
+            }
+          : {
+              background: "#FFFFFF",
+              text_color: palette.accent || palette.primary,
+              border: `1px solid ${palette.accent || palette.primary}`,
+              border_radius: defRadius,
+            },
       },
       inputs: {
         border_color: input?.colors.border || "#CCCCCC",
@@ -904,17 +967,5 @@
     return obj == null ? null : obj;
   };
 
-  // Debug helper: test hexify with known values
-  const hexifyTests = {
-    "rgb(58, 58, 58)": hexify("rgb(58, 58, 58)"),
-    "rgb(255, 223, 51)": hexify("rgb(255, 223, 51)"),
-    "rgb(153, 238, 255)": hexify("rgb(153, 238, 255)"),
-    "color(display-p3 .9816 .3634 .0984)": hexify("color(display-p3 .9816 .3634 .0984)"),
-  };
-
-  return {
-    type: "branding",
-    value: clean(result),
-    _debug_hexify_tests: hexifyTests,
-  };
+  return clean(result);
 })();

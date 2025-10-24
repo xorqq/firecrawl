@@ -33,8 +33,17 @@ import { Action } from "../../../../controllers/v1/types";
 import { AbortManagerThrownError } from "../../lib/abortManager";
 import { youtubePostprocessor } from "../../postprocessors/youtube";
 import { withSpan, setSpanAttributes } from "../../../../lib/otel-tracer";
-import { fireEngineBrandingScript } from "./brandingScript";
 import { BrandingProfile } from "../../../../types/branding";
+
+import { readFileSync } from "fs";
+import { join } from "path";
+
+export const loadBrandingScript = () =>
+  readFileSync(join(__dirname, "brandingScript.js"), "utf-8");
+
+export const brandingScript = loadBrandingScript();
+
+console.log("🔥 brandingScript", brandingScript);
 
 // This function does not take `Meta` on purpose. It may not access any
 // meta values to construct the request -- that must be done by the
@@ -261,7 +270,7 @@ export async function scrapeURLWithFireEngineChromeCDP(
         ? [
             {
               type: "executeJavascript" as const,
-              script: fireEngineBrandingScript,
+              script: brandingScript,
             },
           ]
         : []),
