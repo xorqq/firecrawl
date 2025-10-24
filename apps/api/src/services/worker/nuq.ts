@@ -1243,7 +1243,11 @@ class NuQ<JobData = any, JobReturnValue = any> {
   public async getMetrics(): Promise<string> {
     const start = Date.now();
     const result = await nuqPool.query(
-      `SELECT status, COUNT(id) as count FROM ${this.queueName} GROUP BY status ORDER BY count DESC;`,
+      `
+        SELECT status::text, COUNT(id) as count FROM ${this.queueName} GROUP BY status
+        UNION ALL
+        SELECT 'backlog'::text as status, COUNT(id) as count FROM ${this.queueName}_backlog
+      `,
     );
     logger.info("nuqGetMetrics metrics", {
       module: "nuq/metrics",
