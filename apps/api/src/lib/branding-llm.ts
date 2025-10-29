@@ -2,6 +2,7 @@ import { generateObject } from "ai";
 import { getModel } from "./generic-ai";
 import { z } from "zod";
 import { BrandingProfile } from "../types/branding";
+import { logger } from "./logger";
 
 // Schema for LLM output
 const brandingEnhancementSchema = z.object({
@@ -157,8 +158,8 @@ export async function enhanceBrandingWithLLM(
 
     return result.object;
   } catch (error) {
-    console.error("LLM branding enhancement failed:", error);
-    // Return default/fallback
+    logger.error("LLM branding enhancement failed", { error });
+
     return {
       cleaned_fonts: [],
       button_classification: {
