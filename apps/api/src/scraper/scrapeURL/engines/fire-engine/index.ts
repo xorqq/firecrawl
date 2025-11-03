@@ -33,8 +33,6 @@ import { Action } from "../../../../controllers/v1/types";
 import { AbortManagerThrownError } from "../../lib/abortManager";
 import { youtubePostprocessor } from "../../postprocessors/youtube";
 import { withSpan, setSpanAttributes } from "../../../../lib/otel-tracer";
-import { BrandingProfile } from "../../../../types/branding";
-
 import { getBrandingScript } from "./brandingScript";
 
 // This function does not take `Meta` on purpose. It may not access any
@@ -373,25 +371,6 @@ export async function scrapeURLWithFireEngineChromeCDP(
         }
       });
 
-    const brandingResult = (() => {
-      const entry = javascriptReturns.find(x => x.type === "branding");
-      if (!entry) return undefined;
-      if (typeof entry.value === "string") {
-        try {
-          return JSON.parse(entry.value) as BrandingProfile;
-        } catch (error) {
-          meta.logger.warn("Failed to parse branding payload string", {
-            error,
-          });
-          return undefined;
-        }
-      }
-      if (entry.value && typeof entry.value === "object") {
-        return entry.value as BrandingProfile;
-      }
-      return undefined;
-    })();
-
     return {
       url: response.url ?? meta.url,
 
@@ -420,7 +399,6 @@ export async function scrapeURLWithFireEngineChromeCDP(
 
       proxyUsed: response.usedMobileProxy ? "stealth" : "basic",
       youtubeTranscriptContent: response.youtubeTranscriptContent,
-      branding: brandingResult,
     };
   });
 }
