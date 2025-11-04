@@ -258,6 +258,35 @@ async function buildMetaObject(
     );
   }
 
+  const urlObj = new URL(url);
+  const hostname = urlObj.hostname.replace(/^www\./, "");
+  const isAmazonDomain =
+    hostname === "amazon.com" ||
+    hostname === "amazon.in" ||
+    hostname === "amazon.co.uk" ||
+    hostname === "amazon.de" ||
+    hostname.endsWith(".amazon.com") ||
+    hostname.endsWith(".amazon.in") ||
+    hostname.endsWith(".amazon.co.uk") ||
+    hostname.endsWith(".amazon.de");
+
+  const hasScreenshot = options.formats?.some(
+    f =>
+      (typeof f === "string" &&
+        (f === "screenshot" || f === "screenshot@fullPage")) ||
+      (typeof f === "object" && f.type === "screenshot"),
+  );
+  const hasActions = options.actions && options.actions.length > 0;
+
+  if (
+    isAmazonDomain &&
+    options.fastMode === undefined &&
+    !hasScreenshot &&
+    !hasActions
+  ) {
+    options = { ...options, fastMode: true };
+  }
+
   const logger = _logger.child({
     module: "ScrapeURL",
     scrapeId: id,
