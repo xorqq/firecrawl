@@ -49,6 +49,7 @@ import { LLMRefusalError } from "./transformers/llmExtract";
 import { urlSpecificParams } from "./lib/urlSpecificParams";
 import { loadMock, MockState } from "./lib/mock";
 import { CostTracking } from "../../lib/cost-tracking";
+import { getEngineForUrl } from "../WebScraper/utils/engine-forcing";
 import {
   addIndexRFInsertJob,
   generateDomainSplits,
@@ -256,6 +257,15 @@ async function buildMetaObject(
       internalOptions,
       specParams.internalOptions,
     );
+  }
+
+  if (internalOptions.forceEngine === undefined) {
+    const forcedEngine = getEngineForUrl(url);
+    if (forcedEngine !== undefined) {
+      internalOptions = Object.assign(internalOptions, {
+        forceEngine: forcedEngine,
+      });
+    }
   }
 
   const logger = _logger.child({
