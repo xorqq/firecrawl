@@ -267,7 +267,7 @@ export async function scrapeController(
       });
 
       logger.info("Request metrics", {
-        version: "v2",
+        version: "v2.5",
         scrapeId: jobId,
         mode: "scrape",
         middlewareStartTime,
