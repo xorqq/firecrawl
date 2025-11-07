@@ -6,7 +6,6 @@ env:
 on:
   push:
     branches:
-      - main
       - nsc/go-service
     paths:
       - apps/go-html-to-md-service/**
