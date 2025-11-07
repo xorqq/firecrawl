@@ -37,18 +37,33 @@ async function oldExtract(
   sender?.send(WebhookEvent.EXTRACT_STARTED, { success: true });
 
   try {
+    // Convert v1 scrapeOptions to v2 format if present
+    const scrapeOptions = req.body.scrapeOptions
+      ? fromV1ScrapeOptions(
+          req.body.scrapeOptions,
+          req.body.scrapeOptions.timeout,
+          req.auth.team_id,
+        ).scrapeOptions
+      : undefined;
+
+    // Create request with converted scrapeOptions
+    const request = {
+      ...req.body,
+      scrapeOptions,
+    };
+
     let result: ExtractResult;
     const model = req.body.agent?.model;
     if (req.body.agent && model && model.toLowerCase().includes("fire-1")) {
       result = await performExtraction(extractId, {
-        request: req.body,
+        request,
         teamId: req.auth.team_id,
         subId: req.acuc?.sub_id ?? undefined,
         apiKeyId: req.acuc?.api_key_id ?? null,
       });
     } else {
       result = await performExtraction_F0(extractId, {
-        request: req.body,
+        request,
         teamId: req.auth.team_id,
         subId: req.acuc?.sub_id ?? undefined,
         apiKeyId: req.acuc?.api_key_id ?? null,

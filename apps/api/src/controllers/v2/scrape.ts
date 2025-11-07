@@ -34,25 +34,29 @@ export async function scrapeController(
       // Set initial span attributes
       setSpanAttributes(span, {
         "scrape.job_id": jobId,
-        "scrape.url": req.body.url,
+        "scrape.url": (req.body as any)?.url,
         "scrape.team_id": req.auth.team_id,
         "scrape.api_key_id": req.acuc?.api_key_id,
         "scrape.middleware_time_ms": controllerStartTime - middlewareStartTime,
       });
 
       // Validation span
-      await withSpan("api.scrape.validate", async validateSpan => {
-        req.body = scrapeRequestSchema.parse(req.body);
-        setSpanAttributes(validateSpan, {
-          "validation.success": true,
-        });
-      });
+      const parsedBody = await withSpan(
+        "api.scrape.validate",
+        async validateSpan => {
+          const parsed = scrapeRequestSchema.parse(req.body);
+          setSpanAttributes(validateSpan, {
+            "validation.success": true,
+          });
+          return parsed;
+        },
+      );
 
       // Permission check span
       const permissions = await withSpan(
         "api.scrape.check_permissions",
         async permSpan => {
-          const perms = checkPermissions(req.body, req.acuc?.flags);
+          const perms = checkPermissions(parsedBody, req.acuc?.flags);
           setSpanAttributes(permSpan, {
             "permissions.success": !perms.error,
             "permissions.error": perms.error,
@@ -73,7 +77,7 @@ export async function scrapeController(
       }
 
       const zeroDataRetention =
-        req.acuc?.flags?.forceZDR || req.body.zeroDataRetention;
+        req.acuc?.flags?.forceZDR || parsedBody.zeroDataRetention;
 
       const logger = _logger.child({
         method: "scrapeController",
@@ -89,23 +93,23 @@ export async function scrapeController(
       logger.debug("Scrape " + jobId + " starting", {
         version: "v2",
         scrapeId: jobId,
-        request: req.body,
+        request: parsedBody,
         originalRequest: preNormalizedBody,
         account: req.account,
       });
 
       setSpanAttributes(span, {
         "scrape.zero_data_retention": zeroDataRetention,
-        "scrape.origin": req.body.origin,
-        "scrape.timeout": req.body.timeout,
+        "scrape.origin": parsedBody.origin,
+        "scrape.timeout": parsedBody.timeout,
       });
 
-      const origin = req.body.origin;
-      const timeout = req.body.timeout;
+      const origin = parsedBody.origin;
+      const timeout = parsedBody.timeout;
 
       const isDirectToBullMQ =
         process.env.SEARCH_PREVIEW_TOKEN !== undefined &&
-        process.env.SEARCH_PREVIEW_TOKEN === req.body.__searchPreviewToken;
+        process.env.SEARCH_PREVIEW_TOKEN === parsedBody.__searchPreviewToken;
 
       const jobPriority = await getJobPriority({
         team_id: req.auth.team_id,
@@ -116,16 +120,25 @@ export async function scrapeController(
       const job = await withSpan(
         "api.scrape.enqueue_job",
         async enqueueSpan => {
+          // Extract scrapeOptions from parsedBody, excluding non-scrapeOptions fields
+          const {
+            url: _url,
+            origin: _origin,
+            integration: _integration,
+            zeroDataRetention: _zeroDataRetention,
+            ...scrapeOptions
+          } = parsedBody;
+
           const result = await addScrapeJob(
             {
-              url: req.body.url,
+              url: parsedBody.url,
               mode: "single_urls",
               team_id: req.auth.team_id,
               scrapeOptions: {
-                ...req.body,
-                ...(req.body.__experimental_cache
+                ...scrapeOptions,
+                ...((preNormalizedBody as any).__experimental_cache
                   ? {
-                      maxAge: req.body.maxAge ?? 4 * 60 * 60 * 1000, // 4 hours
+                      maxAge: parsedBody.maxAge ?? 4 * 60 * 60 * 1000, // 4 hours
                     }
                   : {}),
               },
@@ -134,15 +147,15 @@ export async function scrapeController(
                 saveScrapeResultToGCS: process.env.GCS_FIRE_ENGINE_BUCKET_NAME
                   ? true
                   : false,
-                unnormalizedSourceURL: preNormalizedBody.url,
+                unnormalizedSourceURL: (preNormalizedBody as any).url,
                 bypassBilling: isDirectToBullMQ,
                 zeroDataRetention,
                 teamFlags: req.acuc?.flags ?? null,
               },
               origin,
-              integration: req.body.integration,
+              integration: parsedBody.integration,
               startTime: controllerStartTime,
-              zeroDataRetention,
+              zeroDataRetention: zeroDataRetention ?? false,
               apiKeyId: req.acuc?.api_key_id ?? null,
             },
             jobId,
@@ -161,8 +174,8 @@ export async function scrapeController(
       );
 
       const totalWait =
-        (req.body.waitFor ?? 0) +
-        (req.body.actions ?? []).reduce(
+        (parsedBody.waitFor ?? 0) +
+        (parsedBody.actions ?? []).reduce(
           (a, x) => (x.type === "wait" ? (x.milliseconds ?? 0) : 0) + a,
           0,
         );
@@ -172,14 +185,15 @@ export async function scrapeController(
         // Wait for job completion span
         doc = await withSpan("api.scrape.wait_for_job", async waitSpan => {
           setSpanAttributes(waitSpan, {
-            "wait.timeout": timeout !== undefined ? timeout + totalWait : null,
+            "wait.timeout":
+              timeout !== undefined ? timeout + totalWait : undefined,
             "wait.job_id": jobId,
           });
 
           const result = await waitForJob(
             job ?? jobId,
             timeout !== undefined ? timeout + totalWait : null,
-            zeroDataRetention,
+            zeroDataRetention ?? false,
             logger,
           );
 
@@ -228,7 +242,7 @@ export async function scrapeController(
 
       await scrapeQueue.removeJob(jobId, logger);
 
-      if (!hasFormatOfType(req.body.formats, "rawHtml")) {
+      if (!hasFormatOfType(parsedBody.formats, "rawHtml")) {
         if (doc && doc.rawHtml) {
           delete doc.rawHtml;
         }

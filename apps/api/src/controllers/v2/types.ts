@@ -554,8 +554,10 @@ const baseScrapeOptions = z.strictObject({
   __experimental_omceDomain: z.string().optional(),
 });
 
-const waitForRefine = obj => {
-  if (obj.waitFor && obj.timeout) {
+type ScrapeOptionsBase = z.infer<typeof baseScrapeOptions>;
+
+const waitForRefine = (obj?: ScrapeOptionsBase): boolean => {
+  if (obj && obj.waitFor && obj.timeout) {
     if (typeof obj.timeout !== "number" || obj.timeout <= 0) {
       return false;
     }
@@ -567,34 +569,55 @@ const waitForRefineOpts = {
   message: "waitFor must not exceed half of timeout",
   path: ["waitFor"],
 };
-const extractTransform = obj => {
+
+// Base transform function that handles both nullable and non-nullable cases
+// Uses generic type to preserve all fields from extended schemas
+const extractTransformImpl = <T extends ScrapeOptionsBase | undefined>(
+  obj: T,
+): T extends undefined ? undefined : T => {
+  if (!obj) return obj as T extends undefined ? undefined : T;
   // Handle timeout
+  let result = { ...obj };
   if (
     obj.formats.find(x => typeof x === "object" && x.type === "json") &&
     obj.timeout === 30000
   ) {
-    obj = { ...obj, timeout: 60000 };
+    result = { ...result, timeout: 60000 };
   }
 
-  if (
-    obj.formats?.includes("changeTracking") &&
-    (obj.waitFor === undefined || obj.waitFor < 5000)
-  ) {
-    obj = { ...obj, waitFor: 5000 };
+  const changeTracking = obj.formats?.find(
+    x => typeof x === "object" && x.type === "changeTracking",
+  );
+
+  if (changeTracking && (obj.waitFor === undefined || obj.waitFor < 5000)) {
+    result = { ...result, waitFor: 5000 };
   }
 
-  if (obj.formats?.includes("changeTracking") && obj.timeout === 30000) {
-    obj = { ...obj, timeout: 60000 };
+  if (changeTracking && obj.timeout === 30000) {
+    result = { ...result, timeout: 60000 };
   }
 
   if (
     (obj.proxy === "stealth" || obj.proxy === "auto") &&
     obj.timeout === 30000
   ) {
-    obj = { ...obj, timeout: 120000 };
+    result = { ...result, timeout: 120000 };
   }
 
-  return obj;
+  return result as T extends undefined ? undefined : T;
+};
+
+// Type-safe wrapper for nullable cases (used in optional scrapeOptions)
+const extractTransform = (
+  obj?: ScrapeOptionsBase,
+): ScrapeOptionsBase | undefined => {
+  return extractTransformImpl(obj);
+};
+
+// Type-safe wrapper for non-nullable cases (used in required scrapeOptions schema)
+// This ensures TypeScript knows the output is always ScrapeOptionsBase, not undefined
+const extractTransformRequired = <T extends ScrapeOptionsBase>(obj: T): T => {
+  return extractTransformImpl(obj)! as T;
 };
 
 export const scrapeOptions = strictWithMessage(baseScrapeOptions)
@@ -611,7 +634,7 @@ export const scrapeOptions = strictWithMessage(baseScrapeOptions)
     },
   )
   .refine(waitForRefine, waitForRefineOpts)
-  .transform(extractTransform);
+  .transform(extractTransformRequired);
 
 export type BaseScrapeOptions = z.infer<typeof baseScrapeOptions>;
 
@@ -684,9 +707,7 @@ const extractOptions = z
   )
   .transform(x => ({
     ...x,
-    scrapeOptions: x.scrapeOptions
-      ? extractTransform(x.scrapeOptions)
-      : x.scrapeOptions,
+    scrapeOptions: extractTransform(x.scrapeOptions),
   }));
 
 export const extractRequestSchema = extractOptions;
@@ -702,7 +723,7 @@ const scrapeRequestSchemaBase = baseScrapeOptions.extend({
 
 export const scrapeRequestSchema = strictWithMessage(scrapeRequestSchemaBase)
   .refine(waitForRefine, waitForRefineOpts)
-  .transform(extractTransform);
+  .transform(extractTransformRequired);
 
 export type ScrapeRequest = z.infer<typeof scrapeRequestSchema>;
 // Use z.input on the base schema before strict() to preserve optional fields with defaults
@@ -735,7 +756,7 @@ export const batchScrapeRequestSchema = strictWithMessage(
   batchScrapeRequestSchemaBase,
 )
   .refine(waitForRefine, waitForRefineOpts)
-  .transform(extractTransform);
+  .transform(extractTransformRequired);
 
 const batchScrapeRequestSchemaNoURLValidationBase = baseScrapeOptions.extend({
   urls: z.string().array().min(1),
@@ -752,7 +773,7 @@ export const batchScrapeRequestSchemaNoURLValidation = strictWithMessage(
   batchScrapeRequestSchemaNoURLValidationBase,
 )
   .refine(waitForRefine, waitForRefineOpts)
-  .transform(extractTransform);
+  .transform(extractTransformRequired);
 
 export type BatchScrapeRequest = z.infer<typeof batchScrapeRequestSchema>;
 // Use z.input on the base schema before strict() to preserve optional fields with defaults

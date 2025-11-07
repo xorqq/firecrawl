@@ -7,6 +7,7 @@ import {
   searchRequestSchema,
   ScrapeOptions,
   TeamFlags,
+  scrapeOptions as scrapeOptionsSchema,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
 import { addScrapeJob, waitForJob } from "../../services/queue-jobs";
@@ -224,20 +225,20 @@ export async function x402SearchController(
   let credits_billed = 0;
 
   try {
-    req.body = searchRequestSchema.parse(req.body);
+    const parsedBody = searchRequestSchema.parse(req.body);
 
     // IMPORTANT NOTE: Force results to be at most 10 even if a larger limit is requested
     const MAX_RESULTS = 10;
-    if (req.body.limit > MAX_RESULTS) {
-      req.body.limit = MAX_RESULTS;
+    if (parsedBody.limit > MAX_RESULTS) {
+      parsedBody.limit = MAX_RESULTS;
     }
 
     logger = logger.child({
-      query: req.body.query,
-      origin: req.body.origin,
+      query: parsedBody.query,
+      origin: parsedBody.origin,
     });
 
-    let limit = req.body.limit;
+    let limit = parsedBody.limit;
 
     // Buffer results by 50% to account for filtered URLs
     const num_results_buffer = Math.floor(limit * 2);
@@ -246,12 +247,14 @@ export async function x402SearchController(
 
     // Extract unique types from sources for the search function
     // After transformation, sources is always an array of objects
-    const searchTypes = [...new Set(req.body.sources.map((s: any) => s.type))];
+    const searchTypes = [
+      ...new Set(parsedBody.sources.map((s: any) => s.type)),
+    ];
 
     // Build search query with category filters
     const { query: searchQuery, categoryMap } = buildSearchQuery(
-      req.body.query,
-      req.body.categories as CategoryOption[],
+      parsedBody.query,
+      parsedBody.categories as CategoryOption[],
     );
 
     const searchResponse = (await search({
@@ -259,11 +262,11 @@ export async function x402SearchController(
       logger,
       advanced: false,
       num_results: num_results_buffer,
-      tbs: req.body.tbs,
-      filter: req.body.filter,
-      lang: req.body.lang,
-      country: req.body.country,
-      location: req.body.location,
+      tbs: parsedBody.tbs,
+      filter: parsedBody.filter,
+      lang: parsedBody.lang,
+      country: parsedBody.country,
+      location: parsedBody.location,
       type: searchTypes,
     })) as SearchV2Response;
 
@@ -314,9 +317,9 @@ export async function x402SearchController(
 
     // Check if scraping is requested
     const shouldScrape =
-      req.body.scrapeOptions.formats &&
-      req.body.scrapeOptions.formats.length > 0;
-    const isAsyncScraping = req.body.asyncScraping && shouldScrape;
+      parsedBody.scrapeOptions?.formats &&
+      parsedBody.scrapeOptions?.formats.length > 0;
+    const isAsyncScraping = parsedBody.asyncScraping && shouldScrape;
 
     if (!shouldScrape) {
       // No scraping - just count results for billing
@@ -328,11 +331,15 @@ export async function x402SearchController(
       );
 
       // Create common options
+      // Provide default scrapeOptions if not provided
+      const resolvedScrapeOptions: ScrapeOptions =
+        parsedBody.scrapeOptions ?? scrapeOptionsSchema.parse({});
+
       const scrapeOptions = {
         teamId: req.auth.team_id,
-        origin: req.body.origin,
-        timeout: req.body.timeout,
-        scrapeOptions: req.body.scrapeOptions,
+        origin: parsedBody.origin,
+        timeout: parsedBody.timeout,
+        scrapeOptions: resolvedScrapeOptions,
         bypassBilling: true, // Async mode bills per job, sync mode bills manually
         apiKeyId: req.acuc?.api_key_id ?? null,
       };
@@ -494,15 +501,15 @@ export async function x402SearchController(
             time_taken: timeTakenInSeconds,
             team_id: req.auth.team_id,
             mode: "search",
-            url: req.body.query,
-            scrapeOptions: req.body.scrapeOptions,
+            url: parsedBody.query,
+            scrapeOptions: parsedBody.scrapeOptions,
             crawlerOptions: {
-              ...req.body,
+              ...parsedBody,
               query: undefined,
               scrapeOptions: undefined,
             },
-            origin: req.body.origin,
-            integration: req.body.integration,
+            origin: parsedBody.origin,
+            integration: parsedBody.integration,
             credits_billed,
             zeroDataRetention: false,
           },
@@ -588,16 +595,16 @@ export async function x402SearchController(
         time_taken: timeTakenInSeconds,
         team_id: req.auth.team_id,
         mode: "search",
-        url: req.body.query,
-        scrapeOptions: req.body.scrapeOptions,
+        url: parsedBody.query,
+        scrapeOptions: parsedBody.scrapeOptions,
         crawlerOptions: {
-          ...req.body,
+          ...parsedBody,
           query: undefined,
           scrapeOptions: undefined,
           asyncScraping: isAsyncScraping,
         },
-        origin: req.body.origin,
-        integration: req.body.integration,
+        origin: parsedBody.origin,
+        integration: parsedBody.integration,
         credits_billed,
         zeroDataRetention: false, // not supported
       },

@@ -6,6 +6,8 @@ import {
   CrawlResponse,
   RequestWithAuth,
   toV0CrawlerOptions,
+  scrapeOptions as scrapeOptionsSchema,
+  type ScrapeOptions,
 } from "./types";
 import {
   crawlToCrawler,
@@ -31,9 +33,9 @@ export async function crawlController(
   // Check for URL modification before parsing
   const urlModificationInfo = modifyCrawlUrl(preNormalizedBody.url);
 
-  req.body = crawlRequestSchema.parse(req.body);
+  const parsedBody = crawlRequestSchema.parse(req.body);
 
-  const permissions = checkPermissions(req.body, req.acuc?.flags);
+  const permissions = checkPermissions(parsedBody, req.acuc?.flags);
   if (permissions.error) {
     return res.status(403).json({
       success: false,
@@ -42,7 +44,7 @@ export async function crawlController(
   }
 
   const zeroDataRetention =
-    req.acuc?.flags?.forceZDR || req.body.zeroDataRetention;
+    req.acuc?.flags?.forceZDR || parsedBody.zeroDataRetention;
 
   const id = uuidv4();
   const logger = _logger.child({
@@ -54,7 +56,7 @@ export async function crawlController(
   });
 
   logger.debug("Crawl " + id + " starting", {
-    request: req.body,
+    request: parsedBody,
     originalRequest: preNormalizedBody,
     account: req.account,
   });
@@ -66,20 +68,22 @@ export async function crawlController(
   }
 
   const crawlerOptions = {
-    ...req.body,
+    ...parsedBody,
     url: undefined,
     scrapeOptions: undefined,
     prompt: undefined,
   };
-  const scrapeOptions = req.body.scrapeOptions;
+  // Provide default scrapeOptions if not provided
+  const scrapeOptions: ScrapeOptions =
+    parsedBody.scrapeOptions ?? scrapeOptionsSchema.parse({});
 
   let promptGeneratedOptions = {};
-  if (req.body.prompt) {
+  if (parsedBody.prompt) {
     try {
       // Enhance prompt with discovered site URLs (up to 120) to improve option generation
       const { prompt: enhancedPrompt } = await buildPromptWithWebsiteStructure({
-        basePrompt: req.body.prompt,
-        url: req.body.url,
+        basePrompt: parsedBody.prompt,
+        url: parsedBody.url,
         teamId: req.auth.team_id,
         flags: req.acuc?.flags ?? null,
         logger,
@@ -98,14 +102,14 @@ export async function crawlController(
       );
       promptGeneratedOptions = extract || {};
       logger.debug("Generated crawler options from prompt", {
-        prompt: req.body.prompt,
+        prompt: parsedBody.prompt,
         generatedOptions: promptGeneratedOptions,
       });
       logger.debug(JSON.stringify(promptGeneratedOptions, null, 2));
     } catch (error) {
       logger.error("Failed to generate crawler options from prompt", {
         error: error.message,
-        prompt: req.body.prompt,
+        prompt: parsedBody.prompt,
       });
       return res.status(400).json({
         success: false,
@@ -167,9 +171,9 @@ export async function crawlController(
   });
 
   const sc: StoredCrawl = {
-    originUrl: req.body.url,
+    originUrl: parsedBody.url,
     crawlerOptions: toV0CrawlerOptions(finalCrawlerOptions),
-    scrapeOptions,
+    scrapeOptions: scrapeOptions as Omit<ScrapeOptions, "timeout">,
     internalOptions: {
       disableSmartWaitCache: true,
       teamId: req.auth.team_id,
@@ -181,10 +185,10 @@ export async function crawlController(
     team_id: req.auth.team_id,
     createdAt: Date.now(),
     maxConcurrency:
-      req.body.maxConcurrency !== undefined
+      parsedBody.maxConcurrency !== undefined
         ? req.acuc?.concurrency !== undefined
-          ? Math.min(req.body.maxConcurrency, req.acuc.concurrency)
-          : req.body.maxConcurrency
+          ? Math.min(parsedBody.maxConcurrency, req.acuc.concurrency)
+          : parsedBody.maxConcurrency
         : undefined,
     zeroDataRetention,
   };
@@ -215,16 +219,16 @@ export async function crawlController(
 
   await _addScrapeJobToBullMQ(
     {
-      url: req.body.url,
+      url: parsedBody.url,
       mode: "kickoff" as const,
       team_id: req.auth.team_id,
       crawlerOptions: finalCrawlerOptions,
       scrapeOptions: sc.scrapeOptions,
       internalOptions: sc.internalOptions,
-      origin: req.body.origin,
-      integration: req.body.integration,
+      origin: parsedBody.origin,
+      integration: parsedBody.integration,
       crawl_id: id,
-      webhook: req.body.webhook,
+      webhook: parsedBody.webhook,
       v1: true,
       zeroDataRetention: zeroDataRetention || false,
       apiKeyId: req.acuc?.api_key_id ?? null,
@@ -241,7 +245,7 @@ export async function crawlController(
     ...(urlModificationInfo.wasModified && {
       warning: `The URL you provided included a '/*' suffix, which has been removed to ensure a more targeted and efficient crawl.`,
     }),
-    ...(req.body.prompt && {
+    ...(parsedBody.prompt && {
       promptGeneratedOptions: promptGeneratedOptions,
       finalCrawlerOptions: finalCrawlerOptions,
     }),

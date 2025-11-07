@@ -625,8 +625,8 @@ const fire1Refine = (obj: ScrapeOptionsBase): boolean => {
   return true;
 };
 
-const waitForRefine = (obj: ScrapeOptionsBase): boolean => {
-  if (obj.waitFor !== undefined && obj.timeout !== undefined) {
+const waitForRefine = (obj?: ScrapeOptionsBase): boolean => {
+  if (obj && obj.waitFor !== undefined && obj.timeout !== undefined) {
     if (typeof obj.timeout !== "number" || obj.timeout <= 0) {
       return false;
     }
