@@ -5,8 +5,7 @@ import { nuqRedis, semaphoreKeys } from "./redis";
 
 const { scripts, runScript, ensure } = nuqRedis;
 
-const SEMAPHORE_TTL = 30 * 1000; // 30s timeout for scrape jobs, monitor this.
-// TODO(delong3): heartbeat^
+const SEMAPHORE_TTL = 30 * 1000; // TODO(delong3): scrape max TTL - this needs a heartbeat system
 
 async function acquire(
   teamId: string,
@@ -28,6 +27,7 @@ async function acquire(
     removed,
   };
 }
+
 async function acquireBlocking(
   teamId: string,
   holderId: string,
@@ -104,21 +104,17 @@ async function withSemaphore<T>(
   timeoutMs: number,
   func: (limited: boolean) => Promise<T>,
 ): Promise<T> {
-  if (isSelfHosted()) {
+  if (isSelfHosted() && limit === 0) {
+    limit = 128; // TODO(delong3): change back to `return await func(false)`
     // return await func(false);
-    limit = 128;
   }
 
   const { limited } = await acquireBlocking(teamId, holderId, limit, {
-    base_delay_ms: 25, // TODO(delong3): check delays
+    base_delay_ms: 25,
     max_delay_ms: 250,
     timeout_ms: timeoutMs,
     signal,
   });
-
-  // if (removed > 0) {
-  // _logger.info(`Removed: ${removed} for team: ${teamId}`);
-  // }
 
   try {
     return await func(limited);
