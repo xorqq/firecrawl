@@ -131,18 +131,24 @@ async function withSemaphore<T>(
 
   let intervalHandle: NodeJS.Timeout | null = null;
   try {
-    intervalHandle = setInterval(async () => {
-      const success = await heartbeat(teamId, holderId);
-      if (!success) {
-        if (intervalHandle) clearInterval(intervalHandle);
-        throw new TransportableError(
-          "SCRAPE_TIMEOUT",
-          "semaphore_heartbeat_failed",
-        );
-      }
-    }, SEMAPHORE_TTL / 2);
+    const heartbeatPromise = new Promise<never>((_, reject) => {
+      intervalHandle = setInterval(() => {
+        heartbeat(teamId, holderId).then(success => {
+          if (!success) {
+            if (intervalHandle) clearInterval(intervalHandle);
+            reject(
+              new TransportableError(
+                "SCRAPE_TIMEOUT",
+                "semaphore_heartbeat_failed",
+              ),
+            );
+          }
+        });
+      }, SEMAPHORE_TTL / 2);
+    });
 
-    return await func(limited);
+    const result = await Promise.race([func(limited), heartbeatPromise]);
+    return result;
   } finally {
     if (intervalHandle) clearInterval(intervalHandle);
     await release(teamId, holderId).catch(() => {});
