@@ -6,14 +6,15 @@ import { createHistogram, monitorEventLoopDelay } from "node:perf_hooks";
 
 const stats = {
   active_semaphores: 0,
+  semaphore_grants: 0,
   semaphore_retries: 0,
   semaphore_failures: 0,
   semaphore_timeouts: 0,
   semaphore_aborts: 0,
 };
 
-const semaphoreAcquireHistogram = createHistogram();
-const semaphoreProcessHistogram = createHistogram();
+let semaphoreAcquireHistogram = createHistogram();
+let semaphoreProcessHistogram = createHistogram();
 
 const histogram = monitorEventLoopDelay();
 histogram.enable();
@@ -29,6 +30,7 @@ setInterval(() => {
     external_mb: (m.external / 1024 / 1024).toFixed(1),
 
     active_semaphores: stats.active_semaphores,
+    semaphore_grants: stats.semaphore_grants,
     semaphore_retries: stats.semaphore_retries,
     semaphore_failures: stats.semaphore_failures,
     semaphore_timeouts: stats.semaphore_timeouts,
@@ -36,10 +38,10 @@ setInterval(() => {
 
     acquire_hist: {
       count: histogram.count,
-      min: histogram.min,
-      max: histogram.max,
-      mean: histogram.mean,
-      stddev: histogram.stddev,
+      min: histogram.min / 1e6,
+      max: histogram.max / 1e6,
+      mean: histogram.mean / 1e6,
+      stddev: histogram.stddev / 1e6,
       p50_ms: histogram.percentile(50) / 1e6,
       p90_ms: histogram.percentile(90) / 1e6,
       p95_ms: histogram.percentile(95) / 1e6,
@@ -48,10 +50,10 @@ setInterval(() => {
 
     process_hist: {
       count: semaphoreProcessHistogram.count,
-      min: semaphoreProcessHistogram.min,
-      max: semaphoreProcessHistogram.max,
-      mean: semaphoreProcessHistogram.mean,
-      stddev: semaphoreProcessHistogram.stddev,
+      min: semaphoreProcessHistogram.min / 1e6,
+      max: semaphoreProcessHistogram.max / 1e6,
+      mean: semaphoreProcessHistogram.mean / 1e6,
+      stddev: semaphoreProcessHistogram.stddev / 1e6,
       p50_ms: semaphoreProcessHistogram.percentile(50) / 1e6,
       p90_ms: semaphoreProcessHistogram.percentile(90) / 1e6,
       p95_ms: semaphoreProcessHistogram.percentile(95) / 1e6,
@@ -60,9 +62,11 @@ setInterval(() => {
   });
 }, 10_000);
 
+let lastHistCount = 0;
 setInterval(() => {
   _logger.info("api health check semaphore", {
     active_semaphores: stats.active_semaphores,
+    semaphore_grants: stats.semaphore_grants,
     semaphore_retries: stats.semaphore_retries,
     semaphore_failures: stats.semaphore_failures,
     semaphore_timeouts: stats.semaphore_timeouts,
@@ -70,10 +74,11 @@ setInterval(() => {
 
     acquire_hist: {
       count: histogram.count,
-      min: histogram.min,
-      max: histogram.max,
-      mean: histogram.mean,
-      stddev: histogram.stddev,
+      lastCount: lastHistCount,
+      min: histogram.min / 1e6,
+      max: histogram.max / 1e6,
+      mean: histogram.mean / 1e6,
+      stddev: histogram.stddev / 1e6,
       p50_ms: histogram.percentile(50) / 1e6,
       p90_ms: histogram.percentile(90) / 1e6,
       p95_ms: histogram.percentile(95) / 1e6,
@@ -82,10 +87,10 @@ setInterval(() => {
 
     process_hist: {
       count: semaphoreProcessHistogram.count,
-      min: semaphoreProcessHistogram.min,
-      max: semaphoreProcessHistogram.max,
-      mean: semaphoreProcessHistogram.mean,
-      stddev: semaphoreProcessHistogram.stddev,
+      min: semaphoreProcessHistogram.min / 1e6,
+      max: semaphoreProcessHistogram.max / 1e6,
+      mean: semaphoreProcessHistogram.mean / 1e6,
+      stddev: semaphoreProcessHistogram.stddev / 1e6,
       p50_ms: semaphoreProcessHistogram.percentile(50) / 1e6,
       p90_ms: semaphoreProcessHistogram.percentile(90) / 1e6,
       p95_ms: semaphoreProcessHistogram.percentile(95) / 1e6,
@@ -93,13 +98,16 @@ setInterval(() => {
     },
   });
 
+  lastHistCount = histogram.count;
+
+  stats.semaphore_grants = 0;
   stats.semaphore_retries = 0;
   stats.semaphore_failures = 0;
   stats.semaphore_timeouts = 0;
   stats.semaphore_aborts = 0;
 
-  semaphoreAcquireHistogram.reset();
-  semaphoreProcessHistogram.reset();
+  semaphoreAcquireHistogram = createHistogram();
+  semaphoreProcessHistogram = createHistogram();
 }, 60_000);
 
 const { scripts, runScript, ensure } = nuqRedis;
@@ -173,6 +181,7 @@ async function acquireBlocking(
     if (granted === 1) {
       const duration = process.hrtime.bigint() - start;
       semaphoreAcquireHistogram.record(duration);
+      stats.semaphore_grants++;
 
       return { limited: failedOnce, removed: totalRemoved };
     }
@@ -277,13 +286,13 @@ async function withSemaphore<T>(
     const result = await Promise.race([func(limited), hb.promise]);
     return result;
   } finally {
+    const duration = process.hrtime.bigint() - start;
+    semaphoreProcessHistogram.record(duration);
+
     stats.active_semaphores--;
     hb.stop();
 
     await release(teamId, holderId).catch(() => {});
-
-    const duration = process.hrtime.bigint() - start;
-    semaphoreProcessHistogram.record(duration);
   }
 }
 
