@@ -494,7 +494,7 @@ export interface BatchScrapeResponse {
 }
 
 export interface BatchScrapeJob {
-  id?: string;
+  id: string;
   status: 'scraping' | 'completed' | 'failed' | 'cancelled';
   completed: number;
   total: number;
