@@ -22,6 +22,11 @@ function makeSecureDispatcher(skipTlsVerification: boolean) {
   const agentOpts: undici.Agent.Options = {
     maxRedirections: 5000,
   };
+  if (!process.env.PROXY_SERVER && process.env.USE_DB_AUTHENTICATION) {
+    throw new Error(
+      "PROXY_SERVER is not set and USE_DB_AUTHENTICATION is true",
+    );
+  }
 
   const baseAgent = process.env.PROXY_SERVER
     ? new undici.ProxyAgent({
