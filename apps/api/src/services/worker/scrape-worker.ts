@@ -470,6 +470,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
           pdf_num_pages: doc.metadata.numPages,
           credits_cost: credits_billed ?? 0,
           zeroDataRetention: job.data.zeroDataRetention,
+          skipNuq: job.data.skipNuq ?? false,
         },
         true,
       );
@@ -537,6 +538,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
           pdf_num_pages: doc.metadata.numPages,
           credits_cost: credits_billed ?? 0,
           zeroDataRetention: job.data.zeroDataRetention,
+          skipNuq: job.data.skipNuq ?? false,
         },
         false,
       );
@@ -689,6 +691,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
         cost_tracking: costTracking.toJSON(),
         credits_cost: credits_billed ?? 0,
         zeroDataRetention: job.data.zeroDataRetention,
+        skipNuq: job.data.skipNuq ?? false,
       },
       true,
     );
