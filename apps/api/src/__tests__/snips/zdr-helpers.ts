@@ -41,6 +41,7 @@ export const logIgnoreList = [
   "nuqJobFinish metrics",
   "Starting to update tallies",
   "tally for team",
+  "Finished updating tallies",
 ];
 
 export async function getLogs() {
