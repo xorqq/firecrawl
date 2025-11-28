@@ -119,4 +119,79 @@ describeIf(TEST_PRODUCTION)("V2 Scrape Default maxAge", () => {
     },
     scrapeTimeout * 2 + 20000,
   );
+
+  test(
+    "should return error if cached data does not meet minAge requirement",
+    async () => {
+      const id = crypto.randomUUID();
+      const url = "https://firecrawl.dev/?testId=" + id;
+
+      // First scrape to populate cache
+      const data1 = await scrape(
+        {
+          url,
+        },
+        identity,
+      );
+
+      expect(data1).toBeDefined();
+      expect(data1.metadata.cacheState).toBe("miss");
+
+      // Wait for index to be populated
+      await new Promise(resolve => setTimeout(resolve, 20000));
+
+      // Second scrape with minAge should fail
+      try {
+        await scrape(
+          {
+            url,
+            minAge: 60000,
+          },
+          identity,
+        );
+        fail("Expected scrape to throw error");
+      } catch (error) {
+        expect(error.response.status).toBe(404);
+        expect(error.response.data.success).toBe(false);
+        expect(error.response.data.code).toBe("SCRAPE_NO_CACHED_DATA");
+      }
+    },
+    scrapeTimeout * 2 + 20000,
+  );
+
+  test(
+    "should return cached data if it meets minAge requirement",
+    async () => {
+      const id = crypto.randomUUID();
+      const url = "https://firecrawl.dev/?testId=" + id;
+
+      // First scrape to populate cache
+      const data1 = await scrape(
+        {
+          url,
+        },
+        identity,
+      );
+
+      expect(data1).toBeDefined();
+      expect(data1.metadata.cacheState).toBe("miss");
+
+      // Wait for index to be populated and for data to age
+      await new Promise(resolve => setTimeout(resolve, 35000));
+
+      // Second scrape with minAge should hit cache
+      const data2 = await scrape(
+        {
+          url,
+          minAge: 30000,
+        },
+        identity,
+      );
+
+      expect(data2).toBeDefined();
+      expect(data2.metadata.cacheState).toBe("hit");
+      expect(data2.metadata.cachedAt).toBeDefined();
+    },
+    scrapeTimeout * 2 + 35000,
+  );
 });
