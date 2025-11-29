@@ -1,8 +1,10 @@
 import {
+  CrawlDenialError,
   ErrorCodes,
   MapTimeoutError,
   RacedRedirectError,
   ScrapeJobTimeoutError,
+  SitemapError,
   TransportableError,
   UnknownError,
 } from "./error";
@@ -43,6 +45,8 @@ const errorMap: Record<ErrorCodes, any> = {
   SCRAPE_NO_CACHED_DATA: NoCachedDataError,
   SCRAPE_ACTION_ERROR: ActionError,
   SCRAPE_RACED_REDIRECT_ERROR: RacedRedirectError,
+  SCRAPE_SITEMAP_ERROR: SitemapError,
+  CRAWL_DENIAL: CrawlDenialError,
 
   // Zod errors
   BAD_REQUEST: null,
