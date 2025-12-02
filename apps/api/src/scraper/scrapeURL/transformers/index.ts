@@ -65,6 +65,13 @@ async function deriveMarkdownFromHTML(
   meta: Meta,
   document: Document,
 ): Promise<Document> {
+  if (
+    meta.internalOptions.teamId === "sitemap" ||
+    meta.internalOptions.teamId === "robots-txt"
+  ) {
+    return document;
+  }
+
   if (document.html === undefined) {
     throw new Error(
       "html is undefined -- this transformer is being called out of order",
