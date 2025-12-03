@@ -538,6 +538,11 @@ const extractRefineOpts = {
   message:
     "When 'extract' or 'json' format is specified, corresponding options must be provided, and vice versa",
 } as const;
+// Type-safe wrapper for non-nullable cases (used in required scrapeOptions schema)
+const extractTransformRequired = <T extends ScrapeOptions>(obj: T): T => {
+  return extractTransform(obj) as T;
+};
+
 const extractTransform = (obj: ScrapeOptions) => {
   // Handle timeout
   if (
@@ -862,7 +867,7 @@ const crawlRequestSchemaBase = crawlerOptions.extend({
   url,
   origin: z.string().optional().prefault("api"),
   integration: integrationSchema.optional().transform(val => val || null),
-  scrapeOptions: baseScrapeOptions.optional(),
+  scrapeOptions: baseScrapeOptions.prefault(() => baseScrapeOptions.parse({})),
   webhook: webhookSchema.optional(),
   limit: z.number().prefault(10000),
   maxConcurrency: z.int().positive().optional(),
@@ -901,11 +906,10 @@ export const crawlRequestSchema = crawlRequestSchemaBase
     if (x.crawlEntireDomain !== undefined) {
       x.allowBackwardLinks = x.crawlEntireDomain;
     }
+    const scrapeOptionsValue = x.scrapeOptions ?? baseScrapeOptions.parse({});
     return {
       ...x,
-      scrapeOptions: x.scrapeOptions
-        ? extractTransform(x.scrapeOptions)
-        : undefined,
+      scrapeOptions: extractTransformRequired(scrapeOptionsValue),
     };
   });
 
