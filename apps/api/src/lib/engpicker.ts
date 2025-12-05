@@ -295,7 +295,6 @@ export async function processEngpickerJob() {
     .from("engpicker_verdicts")
     .insert({
       domain_hash: job.domain_hash,
-      domain_level: job.domain_level,
       verdict,
     });
 
