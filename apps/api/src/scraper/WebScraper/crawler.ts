@@ -17,7 +17,7 @@ import { ScrapeJobTimeoutError } from "../../lib/error";
 import { ScrapeOptions } from "../../controllers/v2/types";
 import { filterLinks, filterUrl } from "@mendable/firecrawl-rs";
 
-export const SITEMAP_LIMIT = 10;
+export const SITEMAP_LIMIT = 25;
 const SITEMAP_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
 interface FilterResult {
