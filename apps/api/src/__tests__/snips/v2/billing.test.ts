@@ -6,6 +6,7 @@ import {
   idmux,
   map,
   scrape,
+  scrapeRaw,
   search,
 } from "./lib";
 
@@ -628,5 +629,52 @@ describeIf(TEST_PRODUCTION)("Billing tests", () => {
       expect(rc1 - rc2).toBe(7);
     },
     120000,
+  );
+
+  it.concurrent(
+    "bypassCreditChecks flag allows scraping with zero credits",
+    async () => {
+      const identity = await idmux({
+        name: "billing/bypassCreditChecks allows scraping with zero credits",
+        credits: 0,
+        flags: {
+          bypassCreditChecks: true,
+        },
+      });
+
+      // Scrape should succeed even with 0 credits because bypassCreditChecks is true
+      const scrapeResult = await scrape(
+        {
+          url: TEST_SUITE_WEBSITE,
+        },
+        identity,
+      );
+
+      expect(scrapeResult).toBeDefined();
+      expect(scrapeResult.markdown).toBeDefined();
+    },
+    60000,
+  );
+
+  it.concurrent(
+    "scraping fails with zero credits when bypassCreditChecks is not set",
+    async () => {
+      const identity = await idmux({
+        name: "billing/scraping fails with zero credits",
+        credits: 0,
+      });
+
+      // Scrape should fail with 0 credits when bypassCreditChecks is not set
+      const response = await scrapeRaw(
+        {
+          url: TEST_SUITE_WEBSITE,
+        },
+        identity,
+      );
+
+      expect(response.statusCode).toBe(402);
+      expect(response.body.success).toBe(false);
+    },
+    60000,
   );
 });
