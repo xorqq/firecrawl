@@ -34,40 +34,41 @@ export async function extractStatusController(
   req: RequestWithAuth<{ jobId: string }, any, any>,
   res: Response,
 ) {
-  const extractRequest = await supabaseGetExtractRequestByIdDirect(
-    req.params.jobId,
-  );
-
-  if (!extractRequest || extractRequest.team_id !== req.auth.team_id) {
-    return res.status(404).json({
-      success: false,
-      error: "Extract job not found",
-    });
-  }
-
-  if (extractRequest.kind === "agent") {
-    const agent = await supabaseGetAgentByIdDirect(req.params.jobId);
-
-    let data: any = undefined;
-    if (agent?.is_successful) {
-      data = await getJobFromGCS(agent.id);
+  const extractRequest = config.USE_DB_AUTHENTICATION
+    ? await supabaseGetExtractRequestByIdDirect(req.params.jobId)
+    : null;
+  if (config.USE_DB_AUTHENTICATION) {
+    if (!extractRequest || extractRequest.team_id !== req.auth.team_id) {
+      return res.status(404).json({
+        success: false,
+        error: "Extract job not found",
+      });
     }
 
-    return res.status(200).json({
-      success: true,
-      status: !agent
-        ? "processing"
-        : agent.is_successful
-          ? "completed"
-          : "failed",
-      error: agent?.error || undefined,
-      data,
-      expiresAt: new Date(
-        new Date(agent?.created_at ?? extractRequest.created_at).getTime() +
-          1000 * 60 * 60 * 24,
-      ).toISOString(),
-      creditsUsed: agent?.credits_cost,
-    });
+    if (extractRequest.kind === "agent") {
+      const agent = await supabaseGetAgentByIdDirect(req.params.jobId);
+
+      let data: any = undefined;
+      if (agent?.is_successful) {
+        data = await getJobFromGCS(agent.id);
+      }
+
+      return res.status(200).json({
+        success: true,
+        status: !agent
+          ? "processing"
+          : agent.is_successful
+            ? "completed"
+            : "failed",
+        error: agent?.error || undefined,
+        data,
+        expiresAt: new Date(
+          new Date(agent?.created_at ?? extractRequest.created_at).getTime() +
+            1000 * 60 * 60 * 24,
+        ).toISOString(),
+        creditsUsed: agent?.credits_cost,
+      });
+    }
   }
 
   // Get extract status from Redis (for in-progress jobs)
