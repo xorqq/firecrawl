@@ -16,6 +16,7 @@ from firecrawl.v2.methods.agent import (
     wait_agent
 )
 from firecrawl.v2.types import AgentResponse
+from firecrawl.v2.utils.error_handler import BadRequestError
 
 
 class TestAgentMethods:
@@ -345,13 +346,22 @@ class TestAgentMethods:
         mock_response.ok = False
         mock_response.status_code = 400
         mock_response.text = "Bad Request"
+        # Mock response.json() to return error details
+        mock_response.json.return_value = {
+            "error": "Invalid request",
+            "details": "Bad Request"
+        }
         
         self.mock_client.post.return_value = mock_response
         
-        with pytest.raises(Exception):  # Should raise an error
+        with pytest.raises(BadRequestError) as exc_info:
             start_agent(
                 self.mock_client,
                 None,
                 prompt="Test prompt"
             )
+        
+        # Verify the exception has the correct status code
+        assert exc_info.value.status_code == 400
+        assert "agent" in str(exc_info.value).lower()
 
