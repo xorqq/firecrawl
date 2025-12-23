@@ -49,7 +49,10 @@ export async function extractController(
   });
 
   if (req.body.agent?.model === "v3-beta") {
-    throw new Error("Use the new /agent endpoint instead of passing agent.model=v3-beta into /extract. ");
+    return res.status(400).json({
+      success: false,
+      error: "Use the new /agent endpoint instead of passing agent.model=v3-beta into /extract.",
+    });
   }
 
   const invalidURLs: string[] =
