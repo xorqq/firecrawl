@@ -17,7 +17,6 @@ import {
 import { NotificationType } from "../../types";
 import { deleteKey, getValue, redisEvictConnection, setValue } from "../redis";
 import { redisRateLimitClient } from "../rate-limiter";
-import { getRedisConnection } from "../queue-service";
 import { sendSlackWebhook } from "../alerts/slack";
 import { logger as _logger } from "../../lib/logger";
 
@@ -342,8 +341,6 @@ async function _autoChargeScale(
 
             logger.info("Scale auto-recharge successful");
 
-            await getRedisConnection().sadd("billed_teams", chunk.team_id);
-
             if (config.SLACK_ADMIN_WEBHOOK_URL) {
               sendSlackWebhook(
                 `💰 Auto-recharge successful on team ${chunk.team_id} for ${price.credits} credits (total auto-recharges this month: ${rechargesThisMonth.length + 1}).`,
@@ -591,8 +588,6 @@ async function _autoChargeSelfServe(
                   credits: AUTO_RECHARGE_CREDITS,
                   paymentStatus: paymentStatus.return_status,
                 });
-
-                await getRedisConnection().sadd("billed_teams", chunk.team_id);
 
                 if (config.SLACK_ADMIN_WEBHOOK_URL) {
                   const webhookCooldownKey = `webhook_cooldown_${chunk.team_id}`;
