@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { supabase_service } from "../../../services/supabase";
 import { clearACUC, clearACUCTeam } from "../../auth";
 import { logger } from "../../../lib/logger";
+import { getRedisConnection } from "../../../services/queue-service";
 
 export async function acucCacheClearController(req: Request, res: Response) {
   try {
@@ -18,6 +19,10 @@ export async function acucCacheClearController(req: Request, res: Response) {
 
     await Promise.all((keys.data ?? []).map(x => clearACUC(x.key)));
     await clearACUCTeam(team_id);
+
+    // Add team to billed_teams set so tally gets updated
+    // This is called by firecrawl-web when subscriptions change (including manual auto-recharge pack purchases)
+    await getRedisConnection().sadd("billed_teams", team_id);
 
     logger.info(`ACUC cache cleared for team ${team_id}`);
     res.json({ ok: true });
