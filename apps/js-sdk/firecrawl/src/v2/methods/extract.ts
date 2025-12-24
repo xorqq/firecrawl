@@ -23,8 +23,14 @@ function prepareExtractPayload(args: {
   if (args.prompt != null) body.prompt = args.prompt;
   if (args.schema != null) {
     const s: any = args.schema;
-    const isZod = s && (typeof s.safeParse === "function" || typeof s.parse === "function") && s._def;
-    body.schema = isZod ? zodToJsonSchema(s) : args.schema;
+    const isZodV4 = typeof s.toJSONSchema === "function";
+
+    if (isZodV4) {
+      body.schema = s.toJSONSchema();
+    } else {
+      const isZod = s && (typeof s.safeParse === "function" || typeof s.parse === "function") && s._def;
+      body.schema = isZod ? zodToJsonSchema(s) : args.schema;
+    }
   }
   if (args.systemPrompt != null) body.systemPrompt = args.systemPrompt;
   if (args.allowExternalLinks != null) body.allowExternalLinks = args.allowExternalLinks;

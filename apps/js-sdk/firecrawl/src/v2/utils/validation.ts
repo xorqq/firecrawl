@@ -17,12 +17,17 @@ export function ensureValidFormats(formats?: FormatOption[]): void {
       }
       // Flexibility: allow passing a Zod schema. Convert to JSON schema internally.
       const maybeSchema: any = j.schema as any;
-      const isZod = !!maybeSchema && (typeof maybeSchema.safeParse === "function" || typeof maybeSchema.parse === "function") && !!maybeSchema._def;
-      if (isZod) {
-        try {
-          (j as any).schema = zodToJsonSchema(maybeSchema);
-        } catch {
-          // If conversion fails, leave as-is; server-side may still handle, or request will fail explicitly
+      const isZodV4 = typeof maybeSchema.toJSONSchema === "function";
+      if (isZodV4) {
+        (j as any).schema = maybeSchema.toJSONSchema();
+      } else {
+        const isZod = !!maybeSchema && (typeof maybeSchema.safeParse === "function" || typeof maybeSchema.parse === "function") && !!maybeSchema._def;
+        if (isZod) {
+          try {
+            (j as any).schema = zodToJsonSchema(maybeSchema);
+          } catch {
+            // If conversion fails, leave as-is; server-side may still handle, or request will fail explicitly
+          }
         }
       }
       continue;
