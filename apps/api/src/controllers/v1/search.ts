@@ -320,19 +320,24 @@ export async function searchController(
       searchResults = searchResults.slice(0, limit);
     }
 
+    // Determine if scraping is requested
+    const scrapeful = !!(
+      req.body.scrapeOptions.formats &&
+      req.body.scrapeOptions.formats.length > 0
+    );
+
     if (searchResults.length === 0) {
       logger.info("No search results found");
       responseData.warning = "No search results found";
-    } else if (
-      !req.body.scrapeOptions.formats ||
-      req.body.scrapeOptions.formats.length === 0
-    ) {
+    } else if (!scrapeful) {
       responseData.data = searchResults.map(r => ({
         url: r.url,
         title: r.title,
         description: r.description,
       })) as Document[];
-      credits_billed = Math.ceil(responseData.data.length / 10) * 2;
+      // Calculate search credits (2 credits per 10 results)
+      const searchCredits = Math.ceil(responseData.data.length / 10) * 2;
+      credits_billed = searchCredits;
     } else {
       logger.info("Scraping search results");
       const scrapePromises = searchResults.map(result =>
@@ -391,18 +396,13 @@ export async function searchController(
       allDocsWithCostTracking = docsWithCostTracking;
     }
 
-    // Determine how many credits to bill (search credits only when scraping,
-    // since scrape jobs handle their own billing)
-    const scrapeful = !!(
-      req.body.scrapeOptions.formats &&
-      req.body.scrapeOptions.formats.length > 0
-    );
+    // Bill team - use search credits only when scraping (scrape jobs bill themselves)
+    // When not scraping, credits_billed equals search credits
     const creditsToBill = scrapeful
       ? Math.ceil(responseData.data.length / 10) * 2 // Only search credits
-      : credits_billed; // No scraping, so credits_billed is just search credits
+      : credits_billed;
 
-    // Bill team for search credits only - scrape jobs handle their own billing
-    if (!isSearchPreview) {
+    if (!isSearchPreview && searchResults.length > 0) {
       billTeam(
         req.auth.team_id,
         req.acuc?.sub_id ?? undefined,

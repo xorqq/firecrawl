@@ -376,9 +376,13 @@ export async function searchController(
       req.body.scrapeOptions.formats.length > 0;
     const isAsyncScraping = req.body.asyncScraping && shouldScrape;
 
+    // Calculate search credits once (2 credits per 10 results, or 10 for ZDR)
+    const creditsPerTenResults = isZDR ? 10 : 2;
+    const searchCredits =
+      Math.ceil(totalResultsCount / 10) * creditsPerTenResults;
+
     if (!shouldScrape) {
-      const creditsPerTenResults = isZDR ? 10 : 2;
-      credits_billed = Math.ceil(totalResultsCount / 10) * creditsPerTenResults;
+      credits_billed = searchCredits;
     } else {
       // Common setup for both async and sync scraping
       logger.info(
@@ -543,9 +547,8 @@ export async function searchController(
           );
         }
 
-        const creditsPerTenResults = isZDR ? 10 : 2;
-        credits_billed =
-          Math.ceil(totalResultsCount / 10) * creditsPerTenResults;
+        // In async mode, credits_billed is just search credits (scrape jobs bill themselves when complete)
+        credits_billed = searchCredits;
 
         // Bill for search results now (scrape jobs will bill themselves when they complete)
         if (!isSearchPreview) {
@@ -656,11 +659,6 @@ export async function searchController(
           });
         }
 
-        // Calculate search credits (2 credits per 10 results)
-        const creditsPerTenResults = isZDR ? 10 : 2;
-        const searchCredits =
-          Math.ceil(totalResultsCount / 10) * creditsPerTenResults;
-
         // Sum up scrape credits from each scraped document
         const scrapeCredits = allDocsWithCostTracking.reduce(
           (acc, item) => acc + (item.document.metadata?.creditsUsed ?? 0),
@@ -676,13 +674,6 @@ export async function searchController(
       }
     }
 
-    // Determine how many credits to bill (search credits only when scraping,
-    // since scrape jobs handle their own billing)
-    const creditsPerTenResults = isZDR ? 10 : 2;
-    const creditsToBill = shouldScrape
-      ? Math.ceil(totalResultsCount / 10) * creditsPerTenResults // Only search credits
-      : credits_billed; // No scraping, so credits_billed is just search credits
-
     // Bill team for search credits only
     // - Scrape jobs always handle their own billing (both sync and async)
     // - Search job only bills for search costs (credits per 10 results)
@@ -693,11 +684,11 @@ export async function searchController(
       billTeam(
         req.auth.team_id,
         req.acuc?.sub_id ?? undefined,
-        creditsToBill,
+        searchCredits,
         req.acuc?.api_key_id ?? null,
       ).catch(error => {
         logger.error(
-          `Failed to bill team ${req.acuc?.sub_id} for ${creditsToBill} credits: ${error}`,
+          `Failed to bill team ${req.acuc?.sub_id} for ${searchCredits} credits: ${error}`,
         );
       });
     }
