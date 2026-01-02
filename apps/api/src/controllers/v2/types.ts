@@ -21,7 +21,10 @@ import { ErrorCodes } from "../../lib/error";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
 import { integrationSchema } from "../../utils/integration";
-import { webhookSchema } from "../../services/webhook/schema";
+import {
+  webhookSchema,
+  createWebhookSchema,
+} from "../../services/webhook/schema";
 import { BrandingProfile } from "../../types/branding";
 
 // Base URL schema with common validation logic
@@ -711,35 +714,13 @@ export const extractRequestSchema = extractOptions;
 export type ExtractRequest = z.infer<typeof extractRequestSchema>;
 export type ExtractRequestInput = z.input<typeof extractRequestSchema>;
 
-const BLACKLISTED_WEBHOOK_HEADERS = ["x-firecrawl-signature"];
-
-const agentWebhookSchema = z.preprocess(
-  x => (typeof x === "string" ? { url: x } : x),
-  z
-    .strictObject({
-      url: z.url(),
-      headers: z.record(z.string(), z.string()).prefault({}),
-      metadata: z.record(z.string(), z.string()).prefault({}),
-      events: z
-        .array(
-          z.enum(["started", "action", "completed", "failed", "cancelled"]),
-        )
-        .prefault(["started", "action", "completed", "failed", "cancelled"]),
-    })
-    .refine(
-      obj => {
-        const blacklistedLower = BLACKLISTED_WEBHOOK_HEADERS.map(h =>
-          h.toLowerCase(),
-        );
-        return !Object.keys(obj.headers).some(key =>
-          blacklistedLower.includes(key.toLowerCase()),
-        );
-      },
-      `The following headers are not allowed: ${BLACKLISTED_WEBHOOK_HEADERS.join(", ")}`,
-    ),
-);
-
-type AgentWebhook = z.infer<typeof agentWebhookSchema>;
+const agentWebhookSchema = createWebhookSchema([
+  "started",
+  "action",
+  "completed",
+  "failed",
+  "cancelled",
+]);
 
 export const agentRequestSchema = z.strictObject({
   urls: URL.array().optional(),
