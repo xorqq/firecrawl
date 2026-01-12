@@ -523,25 +523,8 @@ jobs:
           # Verify service health
           curl -s http://localhost:3100/health
 
-      - name: Run tests
+      - name: Run concurrency tests
         run: pnpm harness pnpm jest concurrency
         working-directory: apps/api
         env:
           npm_config_ignore_scripts: "true" # required currently to prevent re-building cached native lib
-
-      - name: Create logs directory
-        if: always()
-        run: |
-          mkdir -p logs
-          cp ./apps/api/firecrawl.log logs/firecrawl.log
-          cd logs
-          zip -r logs.zip ./*
-          echo "${{ secrets.LOG_ENCRYPTION_KEY }}" | gpg --batch --yes --passphrase-fd 0 -c logs.zip
-          rm logs.zip
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Encrypted Logs
-          path: logs/logs.zip.gpg
-          retention-days: 5
