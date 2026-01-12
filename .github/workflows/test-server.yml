@@ -69,7 +69,21 @@ jobs:
             apps/api/pnpm-lock.yaml
             apps/test-site/pnpm-lock.yaml
             apps/playwright-service-ts/pnpm-lock.yaml
-      
+
+      - name: Install FoundationDB client library
+        run: |
+          ARCH=$(dpkg --print-architecture)
+          if [ "$ARCH" = "amd64" ]; then
+            FDB_ARCH="x86_64"
+          elif [ "$ARCH" = "arm64" ]; then
+            FDB_ARCH="aarch64"
+          else
+            echo "Unsupported architecture: $ARCH" && exit 1
+          fi
+          curl -fsSL "https://github.com/apple/foundationdb/releases/download/7.3.69/foundationdb-clients_7.3.69-1_${FDB_ARCH}.deb" -o /tmp/fdb-clients.deb
+          sudo dpkg -i /tmp/fdb-clients.deb
+          rm /tmp/fdb-clients.deb
+
       - run: pnpm fetch
         working-directory: apps/api
       - run: pnpm fetch
@@ -197,24 +211,6 @@ jobs:
         run: |
           docker build -t firecrawl/nuq-postgres:latest ./apps/nuq-postgres
           docker run -d -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=postgres --name postgres firecrawl/nuq-postgres:latest
-
-      - name: Install FoundationDB client library
-        run: |
-          ARCH=$(dpkg --print-architecture)
-          if [ "$ARCH" = "amd64" ]; then
-            FDB_ARCH="x86_64"
-          elif [ "$ARCH" = "arm64" ]; then
-            FDB_ARCH="aarch64"
-          else
-            echo "Unsupported architecture: $ARCH" && exit 1
-          fi
-          curl -fsSL "https://github.com/apple/foundationdb/releases/download/7.3.69/foundationdb-clients_7.3.69-1_${FDB_ARCH}.deb" -o /tmp/fdb-clients.deb
-          sudo dpkg -i /tmp/fdb-clients.deb
-          rm /tmp/fdb-clients.deb
-
-      - name: Rebuild foundationdb native addon
-        run: pnpm rebuild foundationdb
-        working-directory: apps/api
 
       - name: Start FoundationDB server
         run: |
