@@ -169,18 +169,33 @@ impl FdbQueue {
     /// Build a claim key with versionstamp placeholder for SetVersionstampedKey.
     ///
     /// Key format sent to FDB:
-    ///   CLAIMS_PREFIX + job_id_len(4) + job_id + versionstamp_placeholder(10) + offset(4)
+    ///   CLAIMS_PREFIX + job_id_len(4) + job_id + versionstamp_placeholder(10) + worker_id_len(4) + worker_id + offset(4)
     ///
     /// After commit, FDB replaces the placeholder with actual versionstamp and removes
     /// the 4-byte offset suffix, resulting in:
-    ///   CLAIMS_PREFIX + job_id_len(4) + job_id + versionstamp(10)
-    fn build_claim_key_with_versionstamp(job_id: &str) -> Vec<u8> {
+    ///   CLAIMS_PREFIX + job_id_len(4) + job_id + versionstamp(10) + worker_id_len(4) + worker_id
+    ///
+    /// KEY INSIGHT: The versionstamp comes BEFORE worker_id in the final key!
+    /// This means claims are naturally sorted by versionstamp, so the first claim
+    /// in a range scan IS the winner (lowest versionstamp). O(1) winner lookup!
+    ///
+    /// But wait - doesn't this cause conflicts? No! Because:
+    /// 1. FDB's conflict detection uses the key WITH the placeholder (0xff bytes)
+    /// 2. Different workers have different worker_ids AFTER the placeholder
+    /// 3. So each worker's key (with placeholder) is unique: claims/{job_id}/{0xff...}/{worker_id}
+    /// 4. No two workers write to the same conflict range!
+    fn build_claim_key_with_versionstamp(job_id: &str, worker_id: &str) -> Vec<u8> {
         let mut key = CLAIMS_PREFIX.to_vec();
         let job_bytes = job_id.as_bytes();
         key.extend_from_slice(&(job_bytes.len() as u32).to_be_bytes());
         key.extend_from_slice(job_bytes);
+        // Versionstamp comes first (for natural ordering by commit time)
         let versionstamp_offset = key.len();
         key.extend_from_slice(&VERSIONSTAMP_PLACEHOLDER);
+        // Worker_id comes after (makes pre-commit key unique for conflict avoidance)
+        let worker_bytes = worker_id.as_bytes();
+        key.extend_from_slice(&(worker_bytes.len() as u32).to_be_bytes());
+        key.extend_from_slice(worker_bytes);
         // FDB requires 4-byte little-endian offset at end of key for SetVersionstampedKey
         key.extend_from_slice(&(versionstamp_offset as u32).to_le_bytes());
         key
@@ -312,9 +327,15 @@ impl FdbQueue {
     ///
     /// This uses append-only claims with versionstamps for ZERO conflicts:
     /// 1. Snapshot read jobs (no conflict established)
-    /// 2. For each candidate, blind write to claims/{job_id}/{versionstamp}
-    /// 3. Versionstamps are unique per transaction, so writes CANNOT conflict
-    /// 4. Lowest versionstamp wins - that worker owns the job
+    /// 2. For each candidate, blind write to claims/{job_id}/{versionstamp}/{worker_id}
+    /// 3. Worker_id comes AFTER the placeholder, making each worker's pre-commit key unique
+    /// 4. FDB conflict detection sees different keys: claims/{job_id}/{0xff...}/{worker_A} vs {worker_B}
+    /// 5. After commit, versionstamp replaces placeholder, giving natural sort order by commit time
+    /// 6. First claim in range scan = lowest versionstamp = winner (O(1) lookup!)
+    ///
+    /// This design achieves both:
+    /// - Zero conflicts (worker_id differentiates pre-commit keys)
+    /// - O(1) winner determination (versionstamp is first in final key sort order)
     pub async fn pop_next_job(
         &self,
         team_id: &str,
@@ -408,9 +429,9 @@ impl FdbQueue {
                 continue;
             }
 
-            // Submit our claim with versionstamp (CANNOT conflict!)
+            // Submit our claim with versionstamp (conflict-free because worker_id is in key)
             let claim_trx = self.db.create_trx()?;
-            let claim_key = Self::build_claim_key_with_versionstamp(&job.id);
+            let claim_key = Self::build_claim_key_with_versionstamp(&job.id, worker_id);
 
             // Also store the queue_key in the claim value so we can find the job later
             let claim_value = serde_json::json!({
@@ -424,14 +445,16 @@ impl FdbQueue {
                 MutationType::SetVersionstampedKey,
             );
 
-            // Commit our claim - this CANNOT conflict because versionstamp makes key unique
+            // Commit our claim - this CANNOT conflict because worker_id makes key range unique
             claim_trx.commit().await?;
 
-            // Now read all claims to see who won (lowest versionstamp)
+            // Now read the first claim to see who won (lowest versionstamp)
+            // Key format: claims/{job_id}/{versionstamp(10)}/{worker_id}
+            // Claims are naturally sorted by versionstamp, so first one wins! O(1)
             let verify_trx = self.db.create_trx()?;
             let all_claims = verify_trx.get_range(
                 &RangeOption::from((&claims_prefix[..], &claims_end[..])),
-                10,
+                1, // Only need the first one (winner)
                 true, // snapshot
             ).await?;
 
@@ -440,7 +463,7 @@ impl FdbQueue {
                 continue;
             }
 
-            // Claims are ordered by versionstamp (part of key), so first one wins
+            // First claim has lowest versionstamp = winner
             let winning_claim = all_claims.iter().next().unwrap();
             let winning_value: serde_json::Value = serde_json::from_slice(winning_claim.value())?;
 

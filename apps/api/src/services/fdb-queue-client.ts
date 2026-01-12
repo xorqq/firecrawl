@@ -30,8 +30,14 @@ type ClaimedJob = {
   queueKey: string;
 };
 
-// Generate a unique worker ID for this process
-const workerId = `worker-${process.pid}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+// Base worker ID for this process (used for logging/debugging)
+const baseWorkerId = `worker-${process.pid}-${Date.now().toString(36)}`;
+
+// Generate a unique claim ID for each request to prevent concurrent calls
+// from the same process from both thinking they won the same claim
+function generateClaimId(): string {
+  return `${baseWorkerId}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
+}
 
 // Circuit breaker state for FDB service health
 type CircuitState = "closed" | "open" | "half-open";
@@ -190,7 +196,11 @@ async function popNextJobWithBlocking(
   teamId: string,
   blockedCrawlIds: string[],
   crawlConcurrencyChecker?: (crawlId: string) => Promise<boolean>,
+  claimId?: string,
 ): Promise<ClaimedJob | null> {
+  // Generate a unique claim ID for this request chain (reuse for retries)
+  const workerId = claimId ?? generateClaimId();
+
   const result = await httpRequest<ClaimedJob | null>(
     "POST",
     `/queue/pop/${encodeURIComponent(teamId)}`,
@@ -222,6 +232,7 @@ async function popNextJobWithBlocking(
           teamId,
           [...blockedCrawlIds, result.job.crawlId],
           crawlConcurrencyChecker,
+          workerId, // Reuse the same claim ID for the retry chain
         );
       }
       return null;
