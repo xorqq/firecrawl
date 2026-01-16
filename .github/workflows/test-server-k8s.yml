@@ -20,9 +20,6 @@ jobs:
         proxy: ["proxy", "no-proxy"]
         search: ["searxng"]
         ai: ["openai"]
-        # Test sharding: split tests across 3 parallel jobs per configuration
-        # This reduces wall-clock time by ~3x at the cost of more parallel runners
-        shard: [1, 2, 3]
     runs-on: blacksmith-32vcpu-ubuntu-2404
     env:
       HOST: 0.0.0.0
@@ -723,8 +720,8 @@ jobs:
           echo $! > /tmp/resource_monitor_pid.txt
           echo "Resource monitoring started (PID: $(cat /tmp/resource_monitor_pid.txt))"
 
-      - name: Run tests (shard ${{ matrix.shard }}/3)
-        run: pnpm test:snips -- --shard=${{ matrix.shard }}/3
+      - name: Run tests
+        run: pnpm test:snips
         working-directory: apps/api
         env:
           # Override environment variables to use localhost (port-forwarded endpoints)
@@ -892,7 +889,7 @@ jobs:
         if: always()
         uses: dorny/test-reporter@v1
         with:
-          name: Test Report (k8s, ${{ matrix.engine }}, ${{ matrix.proxy }}, ${{ matrix.search }}, ${{ matrix.ai }}, shard-${{ matrix.shard }})
+          name: Test Report (k8s, ${{ matrix.engine }}, ${{ matrix.proxy }}, ${{ matrix.search }}, ${{ matrix.ai }})
           path: apps/api/test-results/junit.xml
           reporter: jest-junit
           fail-on-error: true
@@ -926,30 +923,30 @@ jobs:
           echo "=== Events ==="
           kubectl get events -A --sort-by='.lastTimestamp' | tail -50 || true
 
-      # - name: Collect k8s logs
-      #   if: always()
-      #   run: |
-      #     mkdir -p logs/k8s
+      - name: Collect k8s logs
+        if: always()
+        run: |
+          mkdir -p logs/k8s
 
-      #     # Collect pod logs
-      #     for pod in $(kubectl get pods -A -o name 2>/dev/null); do
-      #       namespace=$(echo $pod | cut -d'/' -f1)
-      #       pod_name=$(echo $pod | cut -d'/' -f2)
-      #       kubectl logs $pod -n $namespace --all-containers=true > logs/k8s/${namespace}-${pod_name}.log 2>&1 || true
-      #     done
+          # Collect pod logs
+          for pod in $(kubectl get pods -A -o name 2>/dev/null); do
+            namespace=$(echo $pod | cut -d'/' -f1)
+            pod_name=$(echo $pod | cut -d'/' -f2)
+            kubectl logs $pod -n $namespace --all-containers=true > logs/k8s/${namespace}-${pod_name}.log 2>&1 || true
+          done
 
-      #     # Collect deployment descriptions
-      #     kubectl describe deployments -A > logs/k8s/deployments.txt 2>&1 || true
-      #     kubectl describe services -A > logs/k8s/services.txt 2>&1 || true
+          # Collect deployment descriptions
+          kubectl describe deployments -A > logs/k8s/deployments.txt 2>&1 || true
+          kubectl describe services -A > logs/k8s/services.txt 2>&1 || true
 
-      # - name: Zip logs
-      #   if: always()
-      #   run: |
-      #     cd logs
-      #     zip -r logs.zip ./* || true
+      - name: Zip logs
+        if: always()
+        run: |
+          cd logs
+          zip -r logs.zip ./* || true
 
-      # - uses: actions/upload-artifact@v4
-      #   if: always()
-      #   with:
-      #     name: Logs (k8s, ${{ matrix.engine }}, ${{ matrix.proxy }}, ${{ matrix.search }}, ${{ matrix.ai }}, shard-${{ matrix.shard }})
-      #     path: logs/logs.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Logs (k8s, ${{ matrix.engine }}, ${{ matrix.proxy }}, ${{ matrix.search }}, ${{ matrix.ai }})
+          path: logs/logs.zip
