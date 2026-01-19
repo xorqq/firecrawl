@@ -260,13 +260,6 @@ export async function scrapeController(
         const timeoutErr =
           e instanceof TransportableError && e.code === "SCRAPE_TIMEOUT";
 
-        if (!timeoutErr) {
-          logger.error(`Error in scrapeController`, {
-            version: "v2",
-            error: e,
-          });
-        }
-
         setSpanAttributes(span, {
           "scrape.error": e instanceof Error ? e.message : String(e),
           "scrape.error_type":
@@ -274,6 +267,12 @@ export async function scrapeController(
         });
 
         if (e instanceof TransportableError) {
+          if (!timeoutErr) {
+            logger.error(`Error in scrapeController`, {
+              version: "v2",
+              error: e,
+            });
+          }
           // DNS resolution errors should return 200 with success: false
           if (e.code === "SCRAPE_DNS_RESOLUTION_ERROR") {
             setSpanAttributes(span, {
