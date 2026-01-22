@@ -1,5 +1,5 @@
 import { type FormatOption, type JsonFormat, type ScrapeOptions, type ScreenshotFormat, type ChangeTrackingFormat } from "../types";
-import { isZodSchema, safeZodSchemaToJsonSchema, looksLikeZodShape } from "../../utils/zodSchemaToJson";
+import { isZodSchema, zodSchemaToJsonSchema, looksLikeZodShape } from "../../utils/zodSchemaToJson";
 
 export function ensureValidFormats(formats?: FormatOption[]): void {
   if (!formats) return;
@@ -15,13 +15,10 @@ export function ensureValidFormats(formats?: FormatOption[]): void {
       if (!j.prompt && !j.schema) {
         throw new Error("json format requires either 'prompt' or 'schema' (or both)");
       }
-      // Flexibility: allow passing a Zod schema. Convert to JSON schema internally.
       const maybeSchema = j.schema;
       if (isZodSchema(maybeSchema)) {
-        // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
-        (j as any).schema = safeZodSchemaToJsonSchema(maybeSchema);
+        (j as any).schema = zodSchemaToJsonSchema(maybeSchema);
       } else if (looksLikeZodShape(maybeSchema)) {
-        // User likely passed schema.shape instead of the schema itself
         throw new Error(
           "json format schema appears to be a Zod schema's .shape property. " +
           "Pass the Zod schema directly (e.g., `schema: MySchema`) instead of `schema: MySchema.shape`. " +
@@ -34,8 +31,7 @@ export function ensureValidFormats(formats?: FormatOption[]): void {
       const ct = fmt as ChangeTrackingFormat;
       const maybeSchema = ct.schema;
       if (isZodSchema(maybeSchema)) {
-        // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
-        (ct as any).schema = safeZodSchemaToJsonSchema(maybeSchema);
+        (ct as any).schema = zodSchemaToJsonSchema(maybeSchema);
       } else if (looksLikeZodShape(maybeSchema)) {
         throw new Error(
           "changeTracking format schema appears to be a Zod schema's .shape property. " +

@@ -1,7 +1,7 @@
 import { type AgentResponse, type AgentStatusResponse, type AgentWebhookConfig } from "../types";
 import { HttpClient } from "../utils/httpClient";
 import { normalizeAxiosError, throwForBadResponse } from "../utils/errorHandler";
-import { isZodSchema, safeZodSchemaToJsonSchema } from "../../utils/zodSchemaToJson";
+import { isZodSchema, zodSchemaToJsonSchema } from "../../utils/zodSchemaToJson";
 import type { ZodTypeAny } from "zod";
 
 function prepareAgentPayload(args: {
@@ -18,8 +18,7 @@ function prepareAgentPayload(args: {
   if (args.urls) body.urls = args.urls;
   body.prompt = args.prompt;
   if (args.schema != null) {
-    // Use isZodSchema and safeZodSchemaToJsonSchema which support both Zod v3 and v4
-    body.schema = isZodSchema(args.schema) ? safeZodSchemaToJsonSchema(args.schema) : args.schema;
+    body.schema = isZodSchema(args.schema) ? zodSchemaToJsonSchema(args.schema) : args.schema;
   }
   if (args.integration && args.integration.trim()) body.integration = args.integration.trim();
   if (args.maxCredits !== null && args.maxCredits !== undefined) body.maxCredits = args.maxCredits;

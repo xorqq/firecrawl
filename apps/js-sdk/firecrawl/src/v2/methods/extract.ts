@@ -2,7 +2,7 @@ import { type ExtractResponse, type ScrapeOptions, type AgentOptions } from "../
 import { HttpClient } from "../utils/httpClient";
 import { ensureValidScrapeOptions } from "../utils/validation";
 import { normalizeAxiosError, throwForBadResponse } from "../utils/errorHandler";
-import { isZodSchema, safeZodSchemaToJsonSchema } from "../../utils/zodSchemaToJson";
+import { isZodSchema, zodSchemaToJsonSchema } from "../../utils/zodSchemaToJson";
 import type { ZodTypeAny } from "zod";
 
 function prepareExtractPayload(args: {
@@ -22,8 +22,7 @@ function prepareExtractPayload(args: {
   if (args.urls) body.urls = args.urls;
   if (args.prompt != null) body.prompt = args.prompt;
   if (args.schema != null) {
-    // Use isZodSchema and safeZodSchemaToJsonSchema which support both Zod v3 and v4
-    body.schema = isZodSchema(args.schema) ? safeZodSchemaToJsonSchema(args.schema) : args.schema;
+    body.schema = isZodSchema(args.schema) ? zodSchemaToJsonSchema(args.schema) : args.schema;
   }
   if (args.systemPrompt != null) body.systemPrompt = args.systemPrompt;
   if (args.allowExternalLinks != null) body.allowExternalLinks = args.allowExternalLinks;

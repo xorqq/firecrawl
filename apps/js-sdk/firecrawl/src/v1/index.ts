@@ -1,6 +1,6 @@
 import axios, { type AxiosResponse, type AxiosRequestHeaders, AxiosError } from "axios";
 import * as zt from "zod";
-import { safeZodSchemaToJsonSchema } from "../utils/zodSchemaToJson";
+import { zodSchemaToJsonSchema } from "../utils/zodSchemaToJson";
 import { TypedEventTarget } from "typescript-event-target";
 
 /**
@@ -707,23 +707,21 @@ export default class FirecrawlApp {
     } as AxiosRequestHeaders;
     let jsonData: any = { url, ...params, origin: typeof (params as any).origin === "string" && (params as any).origin.includes("mcp") ? (params as any).origin : `js-sdk@${this.version}` };
     if (jsonData?.extract?.schema) {
-      // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
       jsonData = {
         ...jsonData,
         extract: {
           ...jsonData.extract,
-          schema: safeZodSchemaToJsonSchema(jsonData.extract.schema),
+          schema: zodSchemaToJsonSchema(jsonData.extract.schema),
         },
       };
     }
 
     if (jsonData?.jsonOptions?.schema) {
-      // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
       jsonData = {
         ...jsonData,
         jsonOptions: {
           ...jsonData.jsonOptions,
-          schema: safeZodSchemaToJsonSchema(jsonData.jsonOptions.schema),
+          schema: zodSchemaToJsonSchema(jsonData.jsonOptions.schema),
         },
       };
     }
@@ -780,14 +778,13 @@ export default class FirecrawlApp {
     };
 
     if (jsonData?.scrapeOptions?.extract?.schema) {
-      // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
       jsonData = {
         ...jsonData,
         scrapeOptions: {
           ...jsonData.scrapeOptions,
           extract: {
             ...jsonData.scrapeOptions.extract,
-            schema: safeZodSchemaToJsonSchema(jsonData.scrapeOptions.extract.schema),
+            schema: zodSchemaToJsonSchema(jsonData.scrapeOptions.extract.schema),
           },
         },
       };
@@ -1085,22 +1082,20 @@ export default class FirecrawlApp {
     const headers = this.prepareHeaders(idempotencyKey);
     let jsonData: any = { urls, webhook, ignoreInvalidURLs, maxConcurrency, ...params, origin: typeof (params as any).origin === "string" && (params as any).origin.includes("mcp") ? (params as any).origin : `js-sdk@${this.version}` };
     if (jsonData?.extract?.schema) {
-      // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
       jsonData = {
         ...jsonData,
         extract: {
           ...jsonData.extract,
-          schema: safeZodSchemaToJsonSchema(jsonData.extract.schema),
+          schema: zodSchemaToJsonSchema(jsonData.extract.schema),
         },
       };
     }
     if (jsonData?.jsonOptions?.schema) {
-      // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
       jsonData = {
         ...jsonData,
         jsonOptions: {
           ...jsonData.jsonOptions,
-          schema: safeZodSchemaToJsonSchema(jsonData.jsonOptions.schema),
+          schema: zodSchemaToJsonSchema(jsonData.jsonOptions.schema),
         },
       };
     }
@@ -1292,8 +1287,7 @@ export default class FirecrawlApp {
     const headers = this.prepareHeaders();
 
     let jsonData: { urls?: string[] } & ExtractParams<T> = { urls: urls,  ...params };
-    // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
-    const jsonSchema = params?.schema ? safeZodSchemaToJsonSchema(params.schema) : undefined;
+    const jsonSchema = params?.schema ? zodSchemaToJsonSchema(params.schema) : undefined;
     
     try {
       const response: AxiosResponse = await this.postRequest(
@@ -1351,8 +1345,7 @@ export default class FirecrawlApp {
   ): Promise<ExtractResponse | ErrorResponse> {
     const headers = this.prepareHeaders(idempotencyKey);
     const jsonData: any = { urls, ...params };
-    // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
-    const jsonSchema = params?.schema ? safeZodSchemaToJsonSchema(params.schema) : undefined;
+    const jsonSchema = params?.schema ? zodSchemaToJsonSchema(params.schema) : undefined;
 
     try {
       const response: AxiosResponse = await this.postRequest(
@@ -1721,12 +1714,11 @@ export default class FirecrawlApp {
     let jsonData: any = { query, ...params, origin: typeof (params as any).origin === "string" && (params as any).origin.includes("mcp") ? (params as any).origin : `js-sdk@${this.version}` };
 
     if (jsonData?.jsonOptions?.schema) {
-      // Use safeZodSchemaToJsonSchema which supports both Zod v3 and v4
       jsonData = {
         ...jsonData,
         jsonOptions: {
           ...jsonData.jsonOptions,
-          schema: safeZodSchemaToJsonSchema(jsonData.jsonOptions.schema),
+          schema: zodSchemaToJsonSchema(jsonData.jsonOptions.schema),
         },
       };
     }
