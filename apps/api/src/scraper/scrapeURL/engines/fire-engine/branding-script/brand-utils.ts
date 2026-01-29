@@ -24,10 +24,13 @@ export const getTypography = (): Typography => {
     );
   };
 
-  const h1 = document.querySelector("h1") || document.body;
-  const h2 = document.querySelector("h2") || h1;
-  const p = document.querySelector("p") || document.body;
-  const body = document.body;
+  // Fallback to documentElement when body is null (e.g. incomplete or non-HTML doc)
+  const bodyOrRoot =
+    document.body ?? (document.documentElement as unknown as Element);
+  const h1 = document.querySelector("h1") ?? bodyOrRoot;
+  const h2 = document.querySelector("h2") ?? h1;
+  const p = document.querySelector("p") ?? bodyOrRoot;
+  const body = bodyOrRoot;
 
   return {
     stacks: {

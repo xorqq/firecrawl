@@ -1,3 +1,5 @@
+import { getComputedStyleCached } from "./helpers";
+
 export const resolveSvgUseElements = (
   svgClone: SVGSVGElement,
   originalSvg: SVGSVGElement,
@@ -85,7 +87,7 @@ export const resolveSvgStyles = (svg: SVGSVGElement): SVGSVGElement => {
   const originalElements = [svg, ...Array.from(svg.querySelectorAll("*"))];
   const computedStyles = originalElements.map(el => ({
     el,
-    computed: getComputedStyle(el),
+    computed: getComputedStyleCached(el),
   }));
 
   const clonedElements = [
