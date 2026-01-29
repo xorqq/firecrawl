@@ -13,6 +13,7 @@
     "flyio": "node dist/src/index.js",
     "start:dev": "tsc-watch --onSuccess \"node dist/src/index.js\"",
     "build": "tsc",
+    "build:branding": "node src/scraper/scrapeURL/engines/fire-engine/branding-script/build.js",
     "build:nosentry": "tsc",
     "test": "jest --testPathIgnorePatterns=\"src/__tests__/e2e_noAuth/*\"",
     "test:local-no-auth": "jest --testPathIgnorePatterns=\"src/__tests__/e2e_withAuth/*\"",
@@ -40,6 +41,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "esbuild": "^0.24.0",
     "@jest/globals": "^30.2.0",
     "@sentry/core": "^10.28.0",
     "@types/amqplib": "^0.10.7",
