@@ -1,5 +1,7 @@
 import { getComputedStyleCached } from "./helpers";
 
+const FC_IDX = "data-fc-idx";
+
 export const resolveSvgUseElements = (
   svgClone: SVGSVGElement,
   originalSvg: SVGSVGElement,
@@ -35,6 +37,7 @@ export const resolveSvgUseElements = (
 
     if (referencedEl && useEl.parentNode) {
       const clonedRef = referencedEl.cloneNode(true) as Element;
+      const useIdx = useEl.getAttribute(FC_IDX);
 
       if (clonedRef.tagName === "symbol" || clonedRef.tagName === "SYMBOL") {
         const wrapper = document.createElementNS(
@@ -56,6 +59,8 @@ export const resolveSvgUseElements = (
           }
         });
 
+        if (useIdx != null) wrapper.setAttribute(FC_IDX, useIdx);
+
         while (clonedRef.firstChild) {
           wrapper.appendChild(clonedRef.firstChild);
         }
@@ -72,6 +77,8 @@ export const resolveSvgUseElements = (
           }
         });
 
+        if (useIdx != null) clonedContent.setAttribute(FC_IDX, useIdx);
+
         useEl.parentNode.replaceChild(clonedContent, useEl);
       }
     }
@@ -82,18 +89,21 @@ export const resolveSvgUseElements = (
 
 export const resolveSvgStyles = (svg: SVGSVGElement): SVGSVGElement => {
   const svgClone = svg.cloneNode(true) as SVGSVGElement;
+
+  // Build aligned element lists *before* resolving <use>, so indices stay 1:1.
+  const originalElements = [svg, ...Array.from(svg.querySelectorAll("*"))];
+  const clonedElementsPre = [
+    svgClone,
+    ...Array.from(svgClone.querySelectorAll("*")),
+  ];
+  clonedElementsPre.forEach((el, i) => el.setAttribute(FC_IDX, String(i)));
+
   const svgWithResolvedUse = resolveSvgUseElements(svgClone, svg);
 
-  const originalElements = [svg, ...Array.from(svg.querySelectorAll("*"))];
   const computedStyles = originalElements.map(el => ({
     el,
     computed: getComputedStyleCached(el),
   }));
-
-  const clonedElements = [
-    svgWithResolvedUse,
-    ...Array.from(svgWithResolvedUse.querySelectorAll("*")),
-  ];
 
   const svgDefaults: Record<string, string> = {
     fill: "rgb(0, 0, 0)",
@@ -130,37 +140,38 @@ export const resolveSvgStyles = (svg: SVGSVGElement): SVGSVGElement => {
     }
   };
 
-  for (
-    let i = 0;
-    i < Math.min(clonedElements.length, originalElements.length);
-    i++
-  ) {
-    const clonedEl = clonedElements[i];
+  const allProps = [
+    "fill",
+    "stroke",
+    "color",
+    "stop-color",
+    "flood-color",
+    "lighting-color",
+    "stroke-width",
+    "stroke-dasharray",
+    "stroke-dashoffset",
+    "stroke-linecap",
+    "stroke-linejoin",
+    "opacity",
+    "fill-opacity",
+    "stroke-opacity",
+  ];
+
+  const clonedWithIdx = svgWithResolvedUse.querySelectorAll(`[${FC_IDX}]`);
+  clonedWithIdx.forEach(clonedEl => {
+    const idxStr = clonedEl.getAttribute(FC_IDX);
+    clonedEl.removeAttribute(FC_IDX);
+    if (idxStr == null) return;
+    const i = parseInt(idxStr, 10);
+    if (i < 0 || i >= originalElements.length) return;
     const originalEl = originalElements[i];
     const computed = computedStyles[i]?.computed;
-    if (!computed || !clonedEl) continue;
-
-    const allProps = [
-      "fill",
-      "stroke",
-      "color",
-      "stop-color",
-      "flood-color",
-      "lighting-color",
-      "stroke-width",
-      "stroke-dasharray",
-      "stroke-dashoffset",
-      "stroke-linecap",
-      "stroke-linejoin",
-      "opacity",
-      "fill-opacity",
-      "stroke-opacity",
-    ];
+    if (!computed) return;
 
     for (const prop of allProps) {
       applyResolvedStyle(clonedEl, originalEl, computed, prop);
     }
-  }
+  });
 
   return svgWithResolvedUse;
 };

@@ -310,10 +310,13 @@ export async function brandingTransformer(
       const trustLLMChoice =
         reasoning.includes("LLM picked worse logo") ||
         reasoning.includes("Heuristic preferred over LLM");
+      const isInvalidIndexFallback =
+        reasoning.includes("LLM returned invalid index") ||
+        reasoning.includes("invalid index");
       const isHeuristicFallback =
         reasoning.includes("Heuristic fallback") ||
         reasoning.includes("Heuristic preferred") ||
-        reasoning.includes("Heuristic fallback (LLM returned invalid index)");
+        isInvalidIndexFallback;
       if (
         trustLLMChoice ||
         (reasoning !== "LLM failed" && !isHeuristicFallback)
@@ -321,19 +324,21 @@ export async function brandingTransformer(
         llmLogoSelectionSucceeded = true;
         logoSelectionFinalSource = "llm";
       } else if (
-        reasoning.includes("Heuristic") ||
-        reasoning.includes("heuristic")
+        (reasoning.includes("Heuristic") || reasoning.includes("heuristic")) &&
+        !(
+          isInvalidIndexFallback &&
+          llmEnhancement.logoSelection?.selectedLogoIndex === -1
+        )
       ) {
         logoSelectionFinalSource = "heuristic";
-        if (
-          reasoning.includes("LLM returned invalid index") ||
-          reasoning.includes("invalid index")
-        ) {
+        if (isInvalidIndexFallback) {
           logoSelectionError = "LLM returned invalid logo index";
         }
       } else {
         logoSelectionFinalSource = "fallback";
-        logoSelectionError = reasoning;
+        logoSelectionError = isInvalidIndexFallback
+          ? "LLM returned invalid logo index"
+          : reasoning;
       }
     } else if (logoCandidates.length === 0) {
       logoSelectionFinalSource = "none";
