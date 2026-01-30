@@ -112,6 +112,9 @@ importers:
       dotenv:
         specifier: ^16.3.1
         version: 16.4.5
+      esbuild:
+        specifier: ^0.27.2
+        version: 0.27.2
       escape-html:
         specifier: ^1.0.3
         version: 1.0.3
@@ -275,9 +278,6 @@ importers:
       '@types/tough-cookie':
         specifier: ^4.0.5
         version: 4.0.5
-      esbuild:
-        specifier: ^0.27.2
-        version: 0.27.2
       husky:
         specifier: ^9.1.7
         version: 9.1.7
