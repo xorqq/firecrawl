@@ -129,7 +129,10 @@ impl Client {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn start_agent(&self, options: AgentOptions) -> Result<AgentResponse, FirecrawlError> {
+    pub async fn start_agent(
+        &self,
+        options: AgentOptions,
+    ) -> Result<AgentResponse, FirecrawlError> {
         let headers = self.prepare_headers(None);
 
         let response = self
@@ -247,12 +250,16 @@ impl Client {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn agent(&self, options: AgentOptions) -> Result<AgentStatusResponse, FirecrawlError> {
+    pub async fn agent(
+        &self,
+        options: AgentOptions,
+    ) -> Result<AgentStatusResponse, FirecrawlError> {
         let poll_interval = options.poll_interval.unwrap_or(2000);
         let timeout = options.timeout;
 
         let response = self.start_agent(options).await?;
-        self.wait_for_agent(&response.id, poll_interval, timeout).await
+        self.wait_for_agent(&response.id, poll_interval, timeout)
+            .await
     }
 
     /// Waits for an agent task to complete.

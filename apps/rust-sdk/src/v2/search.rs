@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use super::client::Client;
 use super::scrape::ScrapeOptions;
-use super::types::{Document, SearchCategory, SearchResultImage, SearchResultNews, SearchResultWeb, SearchSource};
+use super::types::{
+    Document, SearchCategory, SearchResultImage, SearchResultNews, SearchResultWeb, SearchSource,
+};
 use crate::FirecrawlError;
 
 /// Options for search requests.

@@ -290,7 +290,8 @@ impl Client {
         let poll_interval = options.poll_interval.unwrap_or(2000);
 
         let response = self.start_batch_scrape(urls, options).await?;
-        self.wait_for_batch_scrape(&response.id, poll_interval).await
+        self.wait_for_batch_scrape(&response.id, poll_interval)
+            .await
     }
 
     /// Waits for a batch scrape job to complete.
@@ -361,10 +362,7 @@ impl Client {
             .send()
             .await
             .map_err(|e| {
-                FirecrawlError::HttpError(
-                    format!("Getting batch scrape errors {}", id.as_ref()),
-                    e,
-                )
+                FirecrawlError::HttpError(format!("Getting batch scrape errors {}", id.as_ref()), e)
             })?;
 
         self.handle_response(response, "batch scrape errors").await
@@ -495,10 +493,7 @@ mod tests {
             .create();
 
         let client = Client::new_selfhosted(server.url(), Some("test_key")).unwrap();
-        let urls = vec![
-            "https://example.com".to_string(),
-            "not-a-url".to_string(),
-        ];
+        let urls = vec!["https://example.com".to_string(), "not-a-url".to_string()];
 
         let options = BatchScrapeOptions {
             ignore_invalid_urls: Some(true),

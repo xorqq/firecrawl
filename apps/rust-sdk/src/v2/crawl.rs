@@ -172,7 +172,9 @@ impl Client {
             .json(&body)
             .send()
             .await
-            .map_err(|e| FirecrawlError::HttpError(format!("Starting crawl of {:?}", url.as_ref()), e))?;
+            .map_err(|e| {
+                FirecrawlError::HttpError(format!("Starting crawl of {:?}", url.as_ref()), e)
+            })?;
 
         self.handle_response(response, "start crawl").await
     }
@@ -298,7 +300,11 @@ impl Client {
     }
 
     /// Waits for a crawl job to complete.
-    async fn wait_for_crawl(&self, id: &str, poll_interval: u64) -> Result<CrawlJob, FirecrawlError> {
+    async fn wait_for_crawl(
+        &self,
+        id: &str,
+        poll_interval: u64,
+    ) -> Result<CrawlJob, FirecrawlError> {
         loop {
             let status = self.get_crawl_status(id).await?;
 
@@ -511,7 +517,10 @@ mod tests {
             .create();
 
         let client = Client::new_selfhosted(server.url(), Some("test_key")).unwrap();
-        let response = client.start_crawl("https://example.com", None).await.unwrap();
+        let response = client
+            .start_crawl("https://example.com", None)
+            .await
+            .unwrap();
 
         assert!(response.success);
         assert_eq!(response.id, "crawl-123");

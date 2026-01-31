@@ -219,9 +219,6 @@ mod tests {
     #[test]
     fn test_url_builder() {
         let client = Client::new("test-key").unwrap();
-        assert_eq!(
-            client.url("/scrape"),
-            "https://api.firecrawl.dev/v2/scrape"
-        );
+        assert_eq!(client.url("/scrape"), "https://api.firecrawl.dev/v2/scrape");
     }
 }

@@ -51,10 +51,17 @@ async fn main() {
         }
     });
     let result = client
-        .scrape_with_schema("https://example.com", schema, Some("Extract title and description"))
+        .scrape_with_schema(
+            "https://example.com",
+            schema,
+            Some("Extract title and description"),
+        )
         .await;
     match result {
-        Ok(data) => println!("Extracted: {}", serde_json::to_string_pretty(&data).unwrap()),
+        Ok(data) => println!(
+            "Extracted: {}",
+            serde_json::to_string_pretty(&data).unwrap()
+        ),
         Err(e) => eprintln!("Schema extraction failed: {}", e),
     }
 

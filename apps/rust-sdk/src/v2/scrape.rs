@@ -365,7 +365,11 @@ mod tests {
         });
 
         let data = client
-            .scrape_with_schema("https://example.com/product", schema, Some("Extract product info"))
+            .scrape_with_schema(
+                "https://example.com/product",
+                schema,
+                Some("Extract product info"),
+            )
             .await
             .unwrap();
 
