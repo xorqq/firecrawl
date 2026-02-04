@@ -33,7 +33,6 @@
     "index-worker:production": "node dist/src/services/indexing/index-worker.js",
     "mongo-docker": "docker run -d -p 2717:27017 -v ./mongo-data:/data/db --name mongodb mongo:latest",
     "mongo-docker-console": "docker exec -it mongodb mongosh",
-    "run-example": "npx tsx src/example.ts",
     "sentry:sourcemaps": "sentry-cli sourcemaps inject --org caleb-peffer --project firecrawl-scraper-js ./dist && sentry-cli sourcemaps upload --org caleb-peffer --project firecrawl-scraper-js ./dist",
     "prepare": "cd ../.. && husky ./apps/api/.husky",
     "knip": "knip"
