@@ -2,7 +2,7 @@ import request from "supertest";
 import { config } from "../../config";
 import { configDotenv } from "dotenv";
 import { ScrapeRequestInput } from "../../controllers/v1/types";
-import { BLOCKLISTED_URL_MESSAGE } from "../../lib/strings";
+import { UNSUPPORTED_SITE_MESSAGE } from "../../lib/strings";
 
 configDotenv();
 const TEST_URL = "http://127.0.0.1:3002";
@@ -52,7 +52,7 @@ describe("E2E Tests for v1 API Routes", () => {
         .send(scrapeRequest);
 
       expect(response.statusCode).toBe(403);
-      expect(response.body.error).toBe(BLOCKLISTED_URL_MESSAGE);
+      expect(response.body.error).toBe(UNSUPPORTED_SITE_MESSAGE);
     });
 
     it.concurrent(
@@ -748,7 +748,7 @@ describe("E2E Tests for v1 API Routes", () => {
         .send(scrapeRequest);
 
       expect(response.statusCode).toBe(403);
-      expect(response.body.error).toBe(BLOCKLISTED_URL_MESSAGE);
+      expect(response.body.error).toBe(UNSUPPORTED_SITE_MESSAGE);
     });
 
     it.concurrent(
