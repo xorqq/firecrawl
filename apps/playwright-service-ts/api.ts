@@ -322,13 +322,10 @@ app.post('/scrape', async (req: Request, res: Response) => {
       requestContext = await createResidentialContext(skip_tls_verification);
       if (requestContext) {
         page = await requestContext.newPage();
-        if (headers) {
-          await page.setExtraHTTPHeaders(headers);
-        }
 
         // Google News referrer unlocks paywalled sites that honour "first
-        // click free" (WSJ, Bloomberg, FT, etc.).
-        await page.setExtraHTTPHeaders({ 'Referer': 'https://news.google.com/' });
+        // click free" (WSJ, Bloomberg, FT, etc.). Merge with caller headers.
+        await page.setExtraHTTPHeaders({ ...(headers || {}), 'Referer': 'https://news.google.com/' });
 
         // Navigate directly (no CF proxy) with networkidle to wait for
         // DataDome JS challenge to auto-resolve and page to reload.
