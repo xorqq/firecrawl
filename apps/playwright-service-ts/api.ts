@@ -18,6 +18,9 @@ const PROXY_SERVER = process.env.PROXY_SERVER || null;
 const PROXY_USERNAME = process.env.PROXY_USERNAME || null;
 const PROXY_PASSWORD = process.env.PROXY_PASSWORD || null;
 const CF_PROXY_URL = process.env.CF_PROXY_URL || null; // e.g. https://scribe-proxy.xorqq.workers.dev
+const RESIDENTIAL_PROXY_SERVER = process.env.RESIDENTIAL_PROXY_SERVER || null;
+const RESIDENTIAL_PROXY_USERNAME = process.env.RESIDENTIAL_PROXY_USERNAME || null;
+const RESIDENTIAL_PROXY_PASSWORD = process.env.RESIDENTIAL_PROXY_PASSWORD || null;
 class Semaphore {
   private permits: number;
   private queue: (() => void)[] = [];
@@ -147,6 +150,42 @@ const createContext = async (skipTlsVerification: boolean = false) => {
   return newContext;
 };
 
+// Create a context with the residential proxy for DataDome/paywall bypass.
+// Uses direct navigation (no CF proxy URL rewriting) so cookies work on the real domain.
+const createResidentialContext = async (skipTlsVerification: boolean = false) => {
+  if (!RESIDENTIAL_PROXY_SERVER) return null;
+
+  const userAgent = new UserAgent().toString();
+  const contextOptions: any = {
+    userAgent,
+    viewport: { width: 1280, height: 800 },
+    ignoreHTTPSErrors: skipTlsVerification,
+    proxy: {
+      server: RESIDENTIAL_PROXY_SERVER,
+      ...(RESIDENTIAL_PROXY_USERNAME && { username: RESIDENTIAL_PROXY_USERNAME }),
+      ...(RESIDENTIAL_PROXY_PASSWORD && { password: RESIDENTIAL_PROXY_PASSWORD }),
+    },
+  };
+
+  const ctx = await browser.newContext(contextOptions);
+
+  if (BLOCK_MEDIA) {
+    await ctx.route('**/*.{png,jpg,jpeg,gif,svg,mp3,mp4,avi,flac,ogg,wav,webm}', async (route: Route) => {
+      await route.abort();
+    });
+  }
+
+  await ctx.route('**/*', (route: Route, request: PlaywrightRequest) => {
+    const hostname = new URL(request.url()).hostname;
+    if (AD_SERVING_DOMAINS.some(domain => hostname.includes(domain))) {
+      return route.abort();
+    }
+    return route.continue();
+  });
+
+  return ctx;
+};
+
 const shutdownBrowser = async () => {
   if (browser) {
     await browser.close();
@@ -270,7 +309,35 @@ app.post('/scrape', async (req: Request, res: Response) => {
       console.log(`🔀 Routing through CF proxy: ${CF_PROXY_URL}`);
     }
 
-    const result = await scrapePage(page, navigateUrl, 'load', wait_after_load, timeout, check_selector);
+    let result = await scrapePage(page, navigateUrl, 'load', wait_after_load, timeout, check_selector);
+
+    // If CF proxy got a non-200 (e.g. DataDome 401, hard paywall), retry with
+    // residential proxy + direct navigation. This lets Playwright handle JS
+    // challenges (DataDome, etc.) with cookies on the real domain.
+    if (result.status !== 200 && CF_PROXY_URL && RESIDENTIAL_PROXY_SERVER) {
+      console.log(`🔄 CF proxy got ${result.status}, retrying via residential proxy...`);
+      await page.close();
+      await requestContext.close();
+
+      requestContext = await createResidentialContext(skip_tls_verification);
+      if (requestContext) {
+        page = await requestContext.newPage();
+        if (headers) {
+          await page.setExtraHTTPHeaders(headers);
+        }
+
+        // Navigate directly (no CF proxy) with networkidle to wait for
+        // DataDome JS challenge to auto-resolve and page to reload.
+        result = await scrapePage(page, url, 'networkidle', Math.max(wait_after_load, 3000), timeout, check_selector);
+
+        if (result.status === 200) {
+          console.log(`✅ Residential proxy bypass succeeded!`);
+        } else {
+          console.log(`🚨 Residential proxy also failed: ${result.status}`);
+        }
+      }
+    }
+
     const pageError = result.status !== 200 ? getError(result.status) : undefined;
 
     // Capture screenshot if requested
