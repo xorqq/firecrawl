@@ -326,6 +326,10 @@ app.post('/scrape', async (req: Request, res: Response) => {
           await page.setExtraHTTPHeaders(headers);
         }
 
+        // Google News referrer unlocks paywalled sites that honour "first
+        // click free" (WSJ, Bloomberg, FT, etc.).
+        await page.setExtraHTTPHeaders({ 'Referer': 'https://news.google.com/' });
+
         // Navigate directly (no CF proxy) with networkidle to wait for
         // DataDome JS challenge to auto-resolve and page to reload.
         result = await scrapePage(page, url, 'networkidle', Math.max(wait_after_load, 3000), timeout, check_selector);
