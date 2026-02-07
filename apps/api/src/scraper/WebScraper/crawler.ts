@@ -395,27 +395,8 @@ export class WebCrawler {
           }
         }
 
-        const isAllowed =
-          this.ignoreRobotsTxt || skipRobots
-            ? true
-            : ((this.robots.isAllowed(link, "FireCrawlAgent") ||
-                this.robots.isAllowed(link, "FirecrawlAgent")) ??
-              true);
-        // Check if the link is disallowed by robots.txt
-        if (!isAllowed) {
-          this.logger.debug(`Link disallowed by robots.txt: ${link}`, {
-            method: "filterLinks",
-            link,
-          });
-          if (config.FIRECRAWL_DEBUG_FILTER_LINKS) {
-            this.logger.debug(`${link} ROBOTS FAIL`);
-          }
-          denialReasons.set(
-            link,
-            `This URL is blocked by the website's robots.txt file, which instructs crawlers not to access this page. Firecrawl respects robots.txt by default. To crawl this URL anyway, set ignoreRobotsTxt: true in your crawl request (note: this may violate the website's crawling policies).`,
-          );
-          return false;
-        }
+        // Self-hosted: always allow all URLs regardless of robots.txt
+        const isAllowed = true;
 
         if (this.isFile(link)) {
           if (config.FIRECRAWL_DEBUG_FILTER_LINKS) {

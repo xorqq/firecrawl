@@ -80,6 +80,8 @@ interface UrlModel {
   headers?: { [key: string]: string };
   check_selector?: string;
   skip_tls_verification?: boolean;
+  screenshot?: boolean;
+  screenshot_full_page?: boolean;
 }
 
 let browser: Browser;
@@ -190,6 +192,7 @@ const scrapePage = async (page: Page, url: string, waitUntil: 'load' | 'networki
     status: response ? response.status() : null,
     headers,
     contentType: ct,
+    screenshot: undefined as string | undefined,
   };
 };
 
@@ -219,7 +222,7 @@ app.get('/health', async (req: Request, res: Response) => {
 });
 
 app.post('/scrape', async (req: Request, res: Response) => {
-  const { url, wait_after_load = 0, timeout = 15000, headers, check_selector, skip_tls_verification = false }: UrlModel = req.body;
+  const { url, wait_after_load = 0, timeout = 15000, headers, check_selector, skip_tls_verification = false, screenshot = false, screenshot_full_page = true }: UrlModel = req.body;
 
   console.log(`================= Scrape Request =================`);
   console.log(`URL: ${url}`);
@@ -228,6 +231,7 @@ app.post('/scrape', async (req: Request, res: Response) => {
   console.log(`Headers: ${headers ? JSON.stringify(headers) : 'None'}`);
   console.log(`Check Selector: ${check_selector ? check_selector : 'None'}`);
   console.log(`Skip TLS Verification: ${skip_tls_verification}`);
+  console.log(`Screenshot: ${screenshot}`);
   console.log(`==================================================`);
 
   if (!url) {
@@ -262,6 +266,17 @@ app.post('/scrape', async (req: Request, res: Response) => {
     const result = await scrapePage(page, url, 'load', wait_after_load, timeout, check_selector);
     const pageError = result.status !== 200 ? getError(result.status) : undefined;
 
+    // Capture screenshot if requested
+    if (screenshot && page) {
+      try {
+        const screenshotBuffer = await page.screenshot({ fullPage: screenshot_full_page, type: 'png' });
+        result.screenshot = `data:image/png;base64,${screenshotBuffer.toString('base64')}`;
+        console.log(`📸 Screenshot captured (${Math.round(screenshotBuffer.length / 1024)}KB)`);
+      } catch (screenshotError) {
+        console.error('Screenshot capture failed:', screenshotError);
+      }
+    }
+
     if (!pageError) {
       console.log(`✅ Scrape successful!`);
     } else {
@@ -272,6 +287,7 @@ app.post('/scrape', async (req: Request, res: Response) => {
       content: result.content,
       pageStatusCode: result.status,
       contentType: result.contentType,
+      ...(result.screenshot && { screenshot: result.screenshot }),
       ...(pageError && { pageError })
     });
 

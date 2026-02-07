@@ -38,68 +38,6 @@ export async function initializeBlocklist() {
 }
 
 export function isUrlBlocked(url: string, flags: TeamFlags): boolean {
-  if (blob === null) {
-    throw new Error("Blocklist not initialized");
-  }
-
-  const lowerCaseUrl = url.trim().toLowerCase();
-
-  let blockedlist = [...blob.blocklist];
-
-  if (flags?.unblockedDomains) {
-    blockedlist = blockedlist.filter(
-      blocked => !flags.unblockedDomains!.includes(blocked),
-    );
-  }
-
-  const decryptedUrl =
-    blockedlist.find(decrypted => lowerCaseUrl === decrypted) || lowerCaseUrl;
-
-  // If the URL is empty or invalid, return false
-  let parsedUrl: any;
-  try {
-    parsedUrl = parse(decryptedUrl);
-  } catch {
-    console.log("Error parsing URL:", url);
-    return false;
-  }
-
-  const domain = parsedUrl.domain;
-  const publicSuffix = parsedUrl.publicSuffix;
-
-  if (!domain) {
-    return false;
-  }
-
-  // Check if URL contains any allowed keyword
-  if (
-    blob.allowedKeywords.some(keyword =>
-      lowerCaseUrl.includes(keyword.toLowerCase()),
-    )
-  ) {
-    return false;
-  }
-
-  // Block exact matches
-  if (blockedlist.includes(domain)) {
-    return true;
-  }
-
-  // Block subdomains
-  if (blockedlist.some(blocked => domain.endsWith(`.${blocked}`))) {
-    return true;
-  }
-
-  // Block different TLDs of the same base domain
-  const baseDomain = domain.split(".")[0]; // Extract the base domain (e.g., "facebook" from "facebook.com")
-  if (
-    publicSuffix &&
-    blockedlist.some(
-      blocked => blocked.startsWith(baseDomain + ".") && blocked !== domain,
-    )
-  ) {
-    return true;
-  }
-
+  // Self-hosted: never block any URL
   return false;
 }
