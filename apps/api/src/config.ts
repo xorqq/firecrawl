@@ -83,6 +83,14 @@ const configSchema = z.object({
   GCS_INDEX_BUCKET_NAME: z.string().optional(),
   GCS_MEDIA_BUCKET_NAME: z.string().optional(),
 
+  // S3-compatible screenshot storage (R2, S3, MinIO, etc.)
+  SCREENSHOT_S3_ENDPOINT: z.string().optional(), // e.g. https://<account>.r2.cloudflarestorage.com
+  SCREENSHOT_S3_REGION: z.string().default("auto"), // "auto" for R2, "us-east-1" for S3, etc.
+  SCREENSHOT_S3_ACCESS_KEY_ID: z.string().optional(),
+  SCREENSHOT_S3_SECRET_ACCESS_KEY: z.string().optional(),
+  SCREENSHOT_S3_BUCKET: z.string().optional(), // bucket name
+  SCREENSHOT_S3_PUBLIC_URL: z.string().optional(), // public base URL for the bucket (e.g. https://screenshots.yourdomain.com)
+
   // Fire Engine
   FIRE_ENGINE_BETA_URL: z.string().optional(),
   FIRE_ENGINE_STAGING_URL: z.string().optional(),
