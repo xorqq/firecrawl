@@ -4,7 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
   injectWorkspacePackages: true
-  injectWorkspacePackages: true
 
 overrides:
   bigint-buffer: npm:four-flap-bigint-buffer@1.1.6
