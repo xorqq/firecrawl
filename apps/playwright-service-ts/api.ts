@@ -17,6 +17,7 @@ const MAX_CONCURRENT_PAGES = Math.max(1, Number.parseInt(process.env.MAX_CONCURR
 const PROXY_SERVER = process.env.PROXY_SERVER || null;
 const PROXY_USERNAME = process.env.PROXY_USERNAME || null;
 const PROXY_PASSWORD = process.env.PROXY_PASSWORD || null;
+const CF_PROXY_URL = process.env.CF_PROXY_URL || null; // e.g. https://scribe-proxy.xorqq.workers.dev
 class Semaphore {
   private permits: number;
   private queue: (() => void)[] = [];
@@ -263,7 +264,13 @@ app.post('/scrape', async (req: Request, res: Response) => {
       await page.setExtraHTTPHeaders(headers);
     }
 
-    const result = await scrapePage(page, url, 'load', wait_after_load, timeout, check_selector);
+    // Route through Cloudflare proxy worker if configured
+    const navigateUrl = CF_PROXY_URL ? `${CF_PROXY_URL.replace(/\/+$/, '')}/${url}` : url;
+    if (CF_PROXY_URL) {
+      console.log(`🔀 Routing through CF proxy: ${CF_PROXY_URL}`);
+    }
+
+    const result = await scrapePage(page, navigateUrl, 'load', wait_after_load, timeout, check_selector);
     const pageError = result.status !== 200 ? getError(result.status) : undefined;
 
     // Capture screenshot if requested
